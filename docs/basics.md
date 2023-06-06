@@ -164,7 +164,7 @@ The following is also correct for the read-only counterparts.
 | Async/iterator/nested methods | No | Yes |
 | Generic type parameters | No | Yes |
 | Composition | Pointer and length | Object, length and index |
-| Convertion | - | `AsSpan` |
+| Conversion | - | `AsSpan` |
 | Performance | More efficient | Less efficient |
 | Ownership | Stack | `IMemoryOwner<T>` |
 

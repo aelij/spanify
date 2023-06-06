@@ -32,7 +32,7 @@ static string GetRandomString(int size, char min = 'a', char max = 'z') =>
 
 `ref struct`s such as `Span` can't be used in generic type parameters (since there's currently no way to prevent boxing), so if we want to base one string on another, we'll have to use `unsafe` code - a pointer.
 
-:warning: Be careful when using unsafe code - it could easily lead to memory corruption. Extensively cover such code with tests.
+:warning: Be careful when using unsafe code - it could easily lead to memory corruption. Extensively cover it with tests.
 
 ```cs
 #pragma warning disable CS8500
@@ -99,7 +99,7 @@ Handlers available in .NET:
 * `DefaultInterpolatedStringHandler` is used in a `String.Create` overload, and emitted by the compiler for regular interpolated strings.
 * `AppendInterpolatedStringHandler` is used in `StringBuilder.Append`. No longer is it needed to break an interpolated string into multiple `Append` calls for efficiency.
 * `AssertInterpolatedStringHandler` and `WriteIfInterpolatedStringHandler` are used in `Debug.Assert` and `Debug.WriteIf` respectively and completely skip writing according to the condition argument.
-* `TryWriteInterpolatedStringHandler` is used by `MemoryExtensions.TryWrite` and allows us to efficiently write strings into a `Span<char>` and :eight: `Utf8.TryWrite` to write into a `Span<byte>`.
+* `TryWriteInterpolatedStringHandler` is used by `MemoryExtensions.TryWrite` and allows us to efficiently write strings into a `Span<char>`. There's a similar one in :eight: `Utf8.TryWrite` to write into a `Span<byte>`.
 
 dotNext also includes:
 * `BufferWriterInterpolatedStringHandler` that writes into an `IBufferWriter<char>`.
@@ -137,7 +137,7 @@ To get a hexadecimal string representing the hash of a string, we'll use the `SH
 
 :warning: The methods below will produce different hashes.
 
-### Using MemoryMarshal
+### Using `MemoryMarshal`
 
 We can use `MemoryMarshal` to reinterpret the string's char array as bytes (an $O(1)$ operation) rather than encode it.
 
@@ -152,7 +152,7 @@ static string GetSha256(this string s)
 }
 ```
 
-### UTF-8 encoding with ArrayPool
+### UTF-8 encoding with `ArrayPool`
 
 UTF-8 encoding can produce a lower byte count for many strings, which would make the hash function faster. We'll use `MemoryRental` again to `stackalloc` or rent an array.
 
