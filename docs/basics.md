@@ -30,10 +30,10 @@ Many .NET classes have been enhanced with `Span` support (and the list keeps gro
 
 * Text: `String`, `StringBuilder`, `Regex`, `Encoding`, `Ascii`, `Utf8`
 * Formatting: `Utf8Formatter`, `Utf8Parser`, `BinaryPrimitives`, `BitConverter`, `Base64`
+* Value types (for example, `Int32`) implementing `ISpanFormattable`, `ISpanParseable`, :eight: `IUtf8SpanFormattable`, :eight: `IUtf8SpanParseable`
 * Cryptography: `RandomNumberGenerator`, `HashAlgorithm`, `AsymmetricAlgorithm`, `SymmetricAlgorithm` `X509Certificate`
 * IO: `Path`, `FileSystemEntry`
 * Streams and networking: `Socket`, `Stream`, `StreamReader`
-* Value types (for example, `Int32`) implementing `ISpanFormattable`, `ISpanParseable`, :eight: `IUtf8SpanFormattable`, :eight: `IUtf8SpanParseable`
 
 Additionally, `MemoryExtensions` has many extension methods.
 
