@@ -67,7 +67,7 @@ To use a method that transforms the string, such as `ToLowerInvariant`, we can u
 
 ```cs
 static string SubstringToLower(this string s, int length) =>
-  string.Create(length, (s, length), static (span, state) => state.s.AsSpan()[..state.length].ToLowerInvariant(span));
+    string.Create(length, (s, length), static (span, state) => state.s.AsSpan()[..state.length].ToLowerInvariant(span));
 ```
 
 We can also create an alternative design for the `ReplaceNonAlphanumeric` method that does not use unsafe code by adding a parameter for the destination span.
@@ -86,7 +86,8 @@ static void ReplaceNonAlphanumeric(this ReadOnlySpan<char> source, Span<char> de
 To use this method, we'll need to allocate the destination span. If our final destination is a `String` we can use `String.Create`, similarly to how we called `ToLowerInvariant`.
 
 ```cs
-string.Create(length: 3, " a^b ", static (span, str) => str.AsSpan().Trim()[..span.Length].ReplaceNonAlphanumeric('_', span)).Dump(); // results in "a_b"
+string.Create(length: 3, " a^b ", static (span, str) =>
+    str.AsSpan().Trim()[..span.Length].ReplaceNonAlphanumeric('_', span)); // results in "a_b"
 ```
 
 ## Interpolated string handlers
