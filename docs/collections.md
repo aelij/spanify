@@ -58,14 +58,14 @@ Comparing it to `for` using BenchmarkDotNet shows nearly a x3 improvement:
 
 `AsSpan` is limited as it cannot change the `Count` of the list. `SetCount` will expand or shrink the list's array to the desired size.
 
-For example, we can use it to copy items from a `Span<T>` to a list.
+For example, we can use it to copy items from a `Span` to a list.
 
 ```cs
 static void AddRange<T>(this List<T> list, ReadOnlySpan<T> span)
 {
-    int oldCount = list.Count;
-    CollectionMarshal.SetCount(list, oldCount + span.Length);
-    span.CopyTo(CollectionMarshal.AsSpan(list).Slice(oldCount))
+    var oldCount = list.Count;
+    CollectionsMarshal.SetCount(list, oldCount + span.Length);
+    span.CopyTo(CollectionsMarshal.AsSpan(list)[oldCount..]);
 }
 ```
 

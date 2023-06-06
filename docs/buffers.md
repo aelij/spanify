@@ -12,19 +12,24 @@
 
 :bulb: If we know the expected capacity, we can set it during initialization to minimize resizing.
 
-### Example: Encoding a string to UTF-8 **-- TODO -- FIND A BETTER EXAMPLE**
+### Example: JSON serialization and `Socket`
 
-The advantage of using it here is that we don't have to use `Encoding.GetByteCount` and just pass the writer directly to `Encoding.GetBytes`.
+As we don't know the size of the JSON string in advance, `IBufferWriter<byte>` allows allocating bytes as needed.
 
 :warning: As with any pooled object, returning the object is essential for performance. Like `MemoryRental`, returning in `PooledArrayBufferWriter` is implemented using the disposable pattern.
 
+:bulb: It's important to dispose the `Utf8JsonWriter` before using the buffer in order to flush all bytes.
+
 ```cs
-static string GetSha256(this string s)
+void SerializeToSocket<T>(Socket socket, T value)
 {
-    using var writer = new PooledArrayBufferWriter<byte>();
-    Encoding.UTF8.GetBytes(s, writer);
-    var hash = (stackalloc byte[32]);
-    SHA256.HashData(writer.WrittenMemory.Span, hash);
-    return Convert.ToHexString(hash);
+    using var bufferWriter = new PooledArrayBufferWriter<byte>();
+
+    using (var jsonWriter = new Utf8JsonWriter(bufferWriter))
+    {
+        JsonSerializer.Serialize(jsonWriter, value);
+    }
+
+    socket.Send(bufferWriter.WrittenMemory.Span);
 }
 ```

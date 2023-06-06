@@ -20,5 +20,5 @@ Parsing and formatting values, by way of writing `JsonConverter`s
 Writing to buffers and streams
 ### [Collections](docs/collections.md)
 Optimize access to collections
-### [Console](docs/console.md) **-- TODO -- is this generally useful? consider removing**
-Reading and writing to the `Console` using UTF-8
+### [Console](docs/console.md)
+Writing to the `Console` using UTF-8
