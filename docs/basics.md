@@ -87,6 +87,72 @@ static string Reverse(string s)
 }
 ```
 
+## `scoped` modifier
+
+The `scoped` keyword can used to restrict the lifetime of a value.
+
+The following method results in an error because the `Span` is used outside the `stackalloc` block.
+
+```cs
+void Method(bool condition)
+{
+    Span<int> span;
+    if (condition)
+    {
+        span = stackalloc int[10]; // error CS8353
+    }
+    else
+    {
+        span = new int[100];
+    }
+
+    Parse(span);
+}
+```
+
+Adding `scoped` fixes the error, as it limits the variable to the current method - it can't escape to callers.
+
+```cs
+void Method(bool condition)
+{
+    scoped Span<int> span;
+    if (condition)
+    {
+        span = stackalloc int[10];
+    }
+    else
+    {
+        span = new int[100];
+    }
+
+    Parse(span);
+}
+```
+
+If we try to copy the scoped `Span` to the caller, we get an error.
+
+```cs
+void Method(bool condition, out Span<int> result)
+{
+    scoped Span<int> span;
+    if (condition)
+    {
+        span = stackalloc int[10];
+    }
+    else
+    {
+        span = new int[100];
+    }
+
+    Parse(span);
+    result = span; // error CS8352
+}
+```
+
+`scoped` can also be used to restrict parameters from being stored in fields.
+
+For more information, see the [C# specification proposal](https://github.com/dotnet/csharplang/blob/main/proposals/csharp-11.0/low-level-struct-improvements.md#scoped-modifier).
+
 ## `Span<T>` vs `Memory<T>`
 
 The following is also correct for the read-only counterparts.
