@@ -4,7 +4,7 @@
 
 When creating a new string whose size is known in advance, we can use the `String.Create` method to avoid additional allocations. This method works by allocating a string and providing a writable `Span` within a delegate. It's safe (meaning the string can't be mutated after creation) since the `Span` can't escape from the delegate.
 
-⚠️ Avoid capturing variables in the delegate as they incur an allocation - pass all data using the `state` parameter. Use the `static` keyword to enforce this.
+:warning: Avoid capturing variables in the delegate as they incur an allocation - pass all data using the `state` parameter. Use the `static` keyword to enforce this.
 
 ### Example: Reversing a string
 
@@ -14,6 +14,8 @@ static string Reverse(this string s) =>
 ```
 
 ### Example: Creating a random string
+
+:bulb: :eight: Can be written using `RandomNumberGenerator.GetString(size, "abcdefghijklmnopqrstuvwxyz")` (which is also cryptographically secure).
 
 ```cs
 static string GetRandomString(int size, char min = 'a', char max = 'z') =>
@@ -28,33 +30,25 @@ static string GetRandomString(int size, char min = 'a', char max = 'z') =>
 
 ### Example: Passing a `Span<T>` to the `Create` method **(Advanced)**
 
-`ref struct`s such as `Span` can't be used in generic type parameters (since there's currently no way to prevent boxing), so if we want to base one string on another, we'll have to use `unsafe` code - a pointer. For this purpose, we can create a generic struct that will host the pointer.
+`ref struct`s such as `Span` can't be used in generic type parameters (since there's currently no way to prevent boxing), so if we want to base one string on another, we'll have to use `unsafe` code - a pointer.
 
-⚠️ Be very careful when using unsafe code - it could easily lead to memory corruption. When we create a `Span` using unsafe methods (for example, from a pointer), there are **no bounds checks**. Extensively cover such code with tests.
-
-```cs
-readonly unsafe struct UnsafeSpan<T>(T* Source, int Length) where T : unmanaged
-{
-    public Span<T> AsSpan() => new(Source, Length);
-}
-```
+:warning: Be careful when using unsafe code - it could easily lead to memory corruption. Extensively cover such code with tests.
 
 ```cs
+#pragma warning disable CS8500
 unsafe static string ReplaceNonAlphanumeric(this ReadOnlySpan<char> s, char replacement)
 {
-    fixed (char* ptr = &s[0])
+    return string.Create(s.Length, (replacement, spanPtr: (IntPtr)(&s)), static (span, state) =>
     {
-        return string.Create(s.Length, (replacement, span: new UnsafeSpan<char>(ptr, s.Length)), static (span, state) =>
+        var sourceSpan = *(ReadOnlySpan<char>*)state.spanPtr;
+        for (int i = 0; i < span.Length; i++)
         {
-            var sourceSpan = state.span.AsSpan();
-            for (int i = 0; i < span.Length; i++)
-            {
-                var c = sourceSpan[i];
-                span[i] = char.IsLetterOrDigit(c) ? c : state.replacement;
-            }
-        });
-    }
+            var c = sourceSpan[i];
+            span[i] = char.IsLetterOrDigit(c) ? c : state.replacement;
+        }
+    });
 }
+#pragma warning restore CS8500
 ```
 
 Using `ReadOnlySpan<char>` as the parameter rather than a string, allows us a lot of flexibility - we can stack-allocate the string, and we can transform it without allocations, as we'll see in the next section.
@@ -104,13 +98,13 @@ Handlers available in .NET:
 * `DefaultInterpolatedStringHandler` is used in a `String.Create` overload, and emitted by the compiler for regular interpolated strings.
 * `AppendInterpolatedStringHandler` is used in `StringBuilder.Append`. No longer is it needed to break an interpolated string into multiple `Append` calls for efficiency.
 * `AssertInterpolatedStringHandler` and `WriteIfInterpolatedStringHandler` are used in `Debug.Assert` and `Debug.WriteIf` respectively and completely skip writing according to the condition argument.
-* `TryWriteInterpolatedStringHandler` is used by `MemoryExtensions.TryWrite` and allows us to efficiently write strings into a `Span<char>` (.NET 8 adds `Utf8.TryWrite` to write into a `Span<byte>`).
+* `TryWriteInterpolatedStringHandler` is used by `MemoryExtensions.TryWrite` and allows us to efficiently write strings into a `Span<char>` and :eight: `Utf8.TryWrite` to write into a `Span<byte>`.
 
 dotNext also includes:
 * `BufferWriterInterpolatedStringHandler` that writes into an `IBufferWriter<char>`.
 * `PoolingInterpolatedStringHandler` which allows using a `Memory<T>` pool rather than allocating new buffers.
 
-💡 We can reuse any of the above handlers to write custom ones.
+:bulb: We can reuse any of the above handlers to write custom ones.
 
 ### Example: `TryWrite`
 
@@ -140,13 +134,13 @@ bool MatchesUriPattern(IEnumerable<Regex> patterns, Uri uri)
 
 To get a hexadecimal string representing the hash of a string, we'll use the `SHA256` algorithm (it could be replaced with others available in .NET).
 
-⚠️ The methods below will produce different hashes.
+:warning: The methods below will produce different hashes.
 
 ### Using MemoryMarshal
 
-We can use `MemoryMarshal` to reinterpret the string's char array as bytes (an _O_(1) operation) rather than encode it.
+We can use `MemoryMarshal` to reinterpret the string's char array as bytes (an $O(1)$ operation) rather than encode it.
 
-However it can (depending on the input) double the time to hash the string as we'll get (_length_ * 2) bytes.
+However it can (depending on the input) double the time to hash the string as we'll get $length * 2$ bytes.
 
 ```cs
 static string GetSha256(this string s)

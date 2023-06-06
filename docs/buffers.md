@@ -10,13 +10,13 @@
 * `PooledArrayBufferWriter<T>` (from dotNext) - uses `ArrayPool<T>`.
 * `PipeWriter` - a `IBufferWriter<byte>` implementation that is used by `Pipe` and can convert from and to `Stream` (`PipeWriter.Create` and `PipeWriter.AsStream` methods, respectively.)
 
-💡 If we know the expected capacity, we can set it during initialization to minimize resizing.
+:bulb: If we know the expected capacity, we can set it during initialization to minimize resizing.
 
 ### Example: Encoding a string to UTF-8 **-- TODO -- FIND A BETTER EXAMPLE**
 
 The advantage of using it here is that we don't have to use `Encoding.GetByteCount` and just pass the writer directly to `Encoding.GetBytes`.
 
-⚠️ As with any pooled object, returning the object is essential for performance. Like `MemoryRental`, returning in `PooledArrayBufferWriter` is implemented using the disposable pattern.
+:warning: As with any pooled object, returning the object is essential for performance. Like `MemoryRental`, returning in `PooledArrayBufferWriter` is implemented using the disposable pattern.
 
 ```cs
 static string GetSha256(this string s)

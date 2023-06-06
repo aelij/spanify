@@ -4,34 +4,41 @@
 
 `CollectionsMarshal` provides **unsafe** access to a few of the basic collections.
 
-⚠️ The reason these methods are not members of the collection classes is that they're unsafe. We recommend using them for performance-critical code.
+:warning: The reason these methods are not members of the collection classes is that they're unsafe. We recommend using them for performance-critical code.
 
-⚠️ Do not modify the collection while using values returned from these methods, as they provide direct references to internal arrays, which can be replaced during various operations.
+:warning: Do not modify the collection while using values returned from these methods, as they provide direct references to internal arrays, which can be replaced during various operations.
 
 ### `List<T>`: `AsSpan`
 
 `List<T>` uses an internal array that gets copied to a larger one as needed. The array's size is represented by the `Capacity` property, while `Count` represents the number of items in the list.
 
-By using `AsSpan` we can get a slice of that array that only contains the `Count` items in the list. This can both improve performance in some cases, and is useful if we want to pass the list to `Span`-based APIs without copying the data (for example, using `ToArray`).
+By using `AsSpan` we can get a slice of that array that only contains the `Count` items in the list. This can both improve performance in some cases, and is useful if we want to pass the list to `Span`-based APIs without copying the data.
 
 For example, we can use `MemoryExtensions.SequenceEqual` to compare two lists fast:
 
 ```cs
-bool SequenceEqual<T>(List<T> listA, List<T> listB) =>
+static bool SequenceEqual<T>(this List<T> listA, List<T> listB) =>
     CollectionsMarshal.AsSpan(listA).SequenceEqual(CollectionsMarshal.AsSpan(listB));
 ```
 
 The `Span` is writable, so we can use it to modify the list:
 
 ```cs
-void Fill<T>(List<T> list, T value) =>
+static void Fill<T>(this List<T> list, T value) =>
     CollectionsMarshal.AsSpan(list).Fill(value);
+```
+
+:eight: Shuffle a list:
+
+```cs
+static void Shuffle<T>(this List<T> list) =>
+    RandomNumberGenerator.Shuffle(CollectionsMarshal.AsSpan(list));
 ```
 
 Modifying the list using the `Span` bypasses the list's change tracking, so it's possible to use an enumerator while setting values. For example:
 
 ```cs
-void Multiply<T>(List<T> list, T factor) where T : struct, INumber<T>
+static void Multiply<T>(this List<T> list, T factor) where T : struct, INumber<T>
 {
     foreach (ref var item in CollectionsMarshal.AsSpan(list))
     {
@@ -46,6 +53,21 @@ Comparing it to `for` using BenchmarkDotNet shows nearly a x3 improvement:
 |------------- |-----------:|---------:|---------:|
 | MultiplySpan |   796.6 ns | 10.96 ns |  9.72 ns |
 |  MultiplyFor | 2,347.3 ns | 45.52 ns | 59.18 ns |
+
+### :eight: `List<T>`: `SetCount`
+
+`AsSpan` is limited as it cannot change the `Count` of the list. `SetCount` will expand or shrink the list's array to the desired size.
+
+For example, we can use it to copy items from a `Span<T>` to a list.
+
+```cs
+static void AddRange<T>(this List<T> list, ReadOnlySpan<T> span)
+{
+    int oldCount = list.Count;
+    CollectionMarshal.SetCount(list, oldCount + span.Length);
+    span.CopyTo(CollectionMarshal.AsSpan(list).Slice(oldCount))
+}
+```
 
 ### `Dictionary<T>`: `GetValueRefOrNullRef` and `GetValueRefOrAddDefault`
 
@@ -98,6 +120,7 @@ bool UnorderedSequenceEqual<T>(IEnumerable<T> a, IEnumerable<T> b) where T : not
         count--;
     }
 
+    // for true high-performance code, replace LINQ with a loop
     return counts.All(kv => kv.Value == 0);
 }
 ```
