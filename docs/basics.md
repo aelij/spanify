@@ -24,11 +24,11 @@ The .NET documentation has a good introduction for `Span`:
 * `MemoryRental<T>` - `Span<T>`/`ArrayPool<T>` wrapper that returns the rented array to the pool when disposed
 * `PooledArrayBufferWriter<T>` - `IBufferWriter<T>` implementation that uses `ArrayPool<T>`
 
-### Always be on the lookout for `Span`-aware APIs
+### `Span`-aware APIs
 
 Many .NET classes have been enhanced with `Span` support (and the list keeps growing). Some of the notable ones:
 
-* Text: `String`, `StringBuilder`, `Regex`, `Encoding`, `Ascii`, `Utf8`
+* Text: `String`, `StringBuilder`, `Regex`, `Encoding`, :eight: `Ascii`, `Utf8`
 * Formatting: `Utf8Formatter`, `Utf8Parser`, `BinaryPrimitives`, `BitConverter`, `Base64`
 * Value types (for example, `Int32`) implementing `ISpanFormattable`, `ISpanParseable`, :eight: `IUtf8SpanFormattable`, :eight: `IUtf8SpanParseable`
 * Cryptography: `RandomNumberGenerator`, `HashAlgorithm`, `AsymmetricAlgorithm`, `SymmetricAlgorithm` `X509Certificate`
@@ -86,6 +86,32 @@ static string Reverse(string s)
     return result.Span.ToString();
 }
 ```
+
+## Code analysis
+
+.NET comes with a few analyzers that produce `Span`- and `Memory`-related diagnostics and fixes. There are [various ways](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/configuration-options) to enable them. We recommend setting [`AnalysisMode`](https://learn.microsoft.com/en-us/dotnet/core/project-sdk/msbuild-props#analysismode) to `Minimum`, `Recommended` or `All` in `Directory.Build.props`.
+
+```xml
+<PropertyGroup>
+  <AnalysisMode>Minimum</AnalysisMode>
+</PropertyGroup>
+```
+
+If this gets to noisy, we can enable only performance analyzers.
+
+```xml
+<PropertyGroup>
+  <AnalysisModePerformance>Minimum</AnalysisModePerformance>
+</PropertyGroup>
+```
+
+### Partial list of analyzers
+
+* `CA1832` and `CA1833`: Use `AsSpan` or `AsMemory` instead of `Range`-based indexers
+* `CA1835`: Prefer the `Memory`-based overloads for `ReadAsync` and `WriteAsync`
+* `CA1844`: Provide `Memory`-based overrides of async methods when subclassing `Stream`
+* `CA1845`: Use `Span`-based `string.Concat`
+* `CA1846`: Prefer `AsSpan` over `Substring`
 
 ## `scoped` modifier
 

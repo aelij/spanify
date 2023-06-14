@@ -38,6 +38,7 @@ class MyValueConverter : JsonConverter<MyValue>
             ? new MyValue(value)
             : throw new FormatException();
 
+    [SkipLocalsInit]
     public override void Write(Utf8JsonWriter writer, MyValue value, JsonSerializerOptions options)
     {
         var bytes = (stackalloc byte[128]);
@@ -86,6 +87,7 @@ class DateTimeConverter : JsonConverter<DateTime>
 {
     private const string DateFormat = "yyyy-MM-dd";
     
+    [SkipLocalsInit]
     public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         var length = reader.HasValueSequence ? checked((int)reader.ValueSequence.Length) : reader.ValueSpan.Length;

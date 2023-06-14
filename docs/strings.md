@@ -1,5 +1,34 @@
 # Strings
 
+## Slicing strings
+
+Before `Span`, we used `String.Substring` to get a part of a string, which allocates a new string and copies the characters to it.
+
+Now we can just slice the `Span` using the range operator, an $O(1)$ operation. We can then pass this `Span` to a method that accepts a `ReadOnlySpan<char>` parameter, such as `Int32.Parse`. See [Basics](basics.md) for a partial list of `Span`-aware APIs.
+
+### Example: Parsing a substring
+
+```cs
+int.Parse("12345".AsSpan()[1..3]) // results in 23
+```
+
+### Example: Concatenating strings
+
+
+```cs
+const string text = "abcdefghijklmnopq";
+
+string ConcatSubstring() => text[10..] + "---" + text[..5];
+string ConcatAsSpan() => string.Concat(text.AsSpan()[10..], "---", text.AsSpan()[..5]);
+```
+
+BenchmarkDotnet results - note the reduction in allocated memory:
+
+|       Method |     Mean |    Error |   StdDev |  Gen 0 | Allocated |
+|------------- |---------:|---------:|---------:|-------:|----------:|
+|    Substring | 30.28 ns | 0.633 ns | 0.621 ns | 0.0306 |     128 B |
+|       AsSpan | 17.30 ns | 0.377 ns | 0.476 ns | 0.0134 |      56 B |
+
 ## Creating strings of a known size using `String.Create`
 
 When creating a new string whose size is known in advance, we can use the `String.Create` method to avoid additional allocations. This method works by allocating a string and providing a writable `Span` within a delegate. It's safe (meaning the string can't be mutated after creation) since the `Span` can't escape from the delegate.
@@ -10,12 +39,16 @@ When creating a new string whose size is known in advance, we can use the `Strin
 
 ```cs
 static string Reverse(this string s) =>
-    string.Create(s.Length, s, static (span, str) => { str.AsSpan().CopyTo(span); span.Reverse(); });
+    string.Create(s.Length, s, static (span, str) =>
+    {
+        str.AsSpan().CopyTo(span);
+        span.Reverse();
+    });
 ```
 
 ### Example: Creating a random string
 
-:bulb: :eight: Can be written using `RandomNumberGenerator.GetString(size, "abcdefghijklmnopqrstuvwxyz")` (which is also cryptographically secure).
+:bulb: :eight: Can be written using `RandomNumberGenerator.GetString(size, "abcdefghijklmnopqrstuvwxyz")`, which is also cryptographically secure.
 
 ```cs
 static string GetRandomString(int size, char min = 'a', char max = 'z') =>
@@ -30,7 +63,7 @@ static string GetRandomString(int size, char min = 'a', char max = 'z') =>
 
 ### Example: Passing a `Span<T>` to the `Create` method **(Advanced)**
 
-`ref struct`s such as `Span` can't be used in generic type parameters (since there's currently no way to prevent boxing), so if we want to base one string on another, we'll have to use `unsafe` code - a pointer.
+`ref struct`s such as `Span` can't be used in generic type parameters (since there's currently no way to prevent boxing), so if we want to base one string on another, we'll have to use `unsafe` code - a pointer - in order to pass it into the generic `SpanAction<T, TArg>` delegate.
 
 :warning: Be careful when using unsafe code - it could easily lead to memory corruption. Extensively cover it with tests.
 
@@ -112,6 +145,7 @@ dotNext also includes:
 The following method checks if the host & port part of a `Uri` matches a list of patterns. Rather than using `Uri.GetLeftPart` which allocates a string, we'll use `TryWrite`. Because it uses an interpolated string handler, there are no additional allocations (for example, to convert the port number into a string). `Regex` also works directly with `Span<char>`.
 
 ```cs
+[SkipLocalsInit]
 bool MatchesUriPattern(IEnumerable<Regex> patterns, Uri uri)
 {
     var maxLength = uri.Scheme.Length + "://".Length + uri.Host.Length + ":".Length + 5;
@@ -128,6 +162,20 @@ bool MatchesUriPattern(IEnumerable<Regex> patterns, Uri uri)
     }
 
     return false;
+}
+```
+
+### Example: Using substrings in interpolated strings
+
+Interpolated string handlers have overloads for `ReadOnlySpan<char>`, which allows us to get substrings without allocating new strings.
+
+:bulb: Consider `String.Create` and `String.Concat` before using an interpolated string, as they would be more efficient.
+
+```cs
+string Format(string str, int num)
+{
+    var index = str.IndexOf(':');
+    return $"{str.AsSpan()[..index]} {num} {str.AsSpan()[(index + 1)..]}";
 }
 ```
 
@@ -159,10 +207,11 @@ UTF-8 encoding can produce a lower byte count for many strings, which would make
 ```cs
 const int StackallocThreshold = 256;
 
+[SkipLocalsInit]
 static string GetSha256(this string s)
 {
     int inputByteCount = Encoding.UTF8.GetByteCount(s);
-    using MemoryRental<char> encodedBytes = length <= StackallocThreshold ? new(stackalloc char[StackallocThreshold]) : new(length);
+    using MemoryRental<char> encodedBytes = inputByteCount <= StackallocThreshold ? new(stackalloc char[StackallocThreshold]) : new(inputByteCount);
     int encodedByteCount = Encoding.UTF8.GetBytes(s, encodedBytes);
     var hash = (stackalloc byte[32]);
     SHA256.HashData(encodedBytes[..encodedByteCount], hash);
