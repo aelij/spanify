@@ -16,7 +16,7 @@ When reading the value, the naive approach is to convert it to a string use `Int
 class NaiveMyValueConverter : JsonConverter<MyValue>
 {
     public override MyValue Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-        new MyValue(long.Parse(reader.GetString());
+        new MyValue(long.Parse(reader.GetString()));
 
     public override void Write(Utf8JsonWriter writer, MyValue value, JsonSerializerOptions options) =>
         writer.WriteStringValue(value.Value.ToString());
@@ -92,7 +92,7 @@ class DateTimeConverter : JsonConverter<DateTime>
     {
         var length = reader.HasValueSequence ? checked((int)reader.ValueSequence.Length) : reader.ValueSpan.Length;
         // allocate a buffer on the stack if possible, otherwise use array pool
-        using MemoryRental<char> chars = length <= StackallocThreshold ? new(stackalloc char[StackallocThreshold]) : new(length);
+        using MemoryRental<char> chars = length <= StackallocThreshold ? new(stackalloc char[StackallocThreshold], length) : new(length);
         // copy the string data to the buffer, unescaping and validating it
         var written = reader.CopyString(chars.Span);
         // parse the date

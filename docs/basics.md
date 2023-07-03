@@ -80,7 +80,7 @@ static string Reverse(string s)
     const int stackallocThreshold = 256;
 
     if (s.Length == 0) return s;
-    using MemoryRental<char> result = s.Length <= stackallocThreshold ? new(stackalloc char[stackallocThreshold]) : new(s.Length);
+    using MemoryRental<char> result = s.Length <= stackallocThreshold ? new(stackalloc char[stackallocThreshold], s.Length) : new(s.Length);
     s.AsSpan().CopyTo(result.Span);
     result.Span.Reverse();
     return result.Span.ToString();

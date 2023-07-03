@@ -149,7 +149,7 @@ The following method checks if the host & port part of a `Uri` matches a list of
 bool MatchesUriPattern(IEnumerable<Regex> patterns, Uri uri)
 {
     var maxLength = uri.Scheme.Length + "://".Length + uri.Host.Length + ":".Length + 5;
-    using MemoryRental<char> hostAndPort = maxLength <= 256 ? new(stackalloc char[256]) : new(maxLength);
+    using MemoryRental<char> hostAndPort = maxLength <= 256 ? new(stackalloc char[256], maxLength) : new(maxLength);
     hostAndPort.Span.TryWrite($"{uri.Scheme}://{uri.Host}:{uri.Port}", out var written);
     var hostAndPortSpan = hostAndPort.Span[..written];
 
@@ -211,10 +211,10 @@ const int StackallocThreshold = 256;
 static string GetSha256(this string s)
 {
     int inputByteCount = Encoding.UTF8.GetByteCount(s);
-    using MemoryRental<char> encodedBytes = inputByteCount <= StackallocThreshold ? new(stackalloc char[StackallocThreshold]) : new(inputByteCount);
-    int encodedByteCount = Encoding.UTF8.GetBytes(s, encodedBytes);
+    using MemoryRental<byte> encodedBytes = inputByteCount <= StackallocThreshold ? new(stackalloc byte[StackallocThreshold], inputByteCount) : new(inputByteCount);
+    int encodedByteCount = Encoding.UTF8.GetBytes(s, encodedBytes.Span);
     var hash = (stackalloc byte[32]);
-    SHA256.HashData(encodedBytes[..encodedByteCount], hash);
+    SHA256.HashData(encodedBytes.Span[..encodedByteCount], hash);
     return Convert.ToHexString(hash);
 }
 ```
