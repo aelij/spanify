@@ -179,6 +179,32 @@ string Format(string str, int num)
 }
 ```
 
+### Example: Using `DefaultInterpolatedStringHandler` instead of `StringBuilder`
+
+`StringBuilder` is a reference type and often in order to avoid allocating new ones, we pool them, or store them in reusable thread-static fields. As an alternative, we can use `DefaultInterpolatedStringHandler` as an **append-only** value type string builder.
+
+:bulb: `StringBuilder` works more like a linked list of arrays while `DefaultInterpolatedStringHandler` works more like a dynamic array. This means that `StringBuilder` might perform better when we can't approximate the final size of the string.
+
+:bulb: When possible, it's preferable to use `stackalloc` to provide the initial buffer as it performs better. If we don't provide an initial buffer, it uses a rented array with a size calculated from the parameters `literalLength` and `formattedCount`.
+
+:warning: The handler uses `ArrayPool<char>` internally when it grows out of the initial buffer, so we must call `ToStringAndClear` to return the rented array rather than `ToString`.
+
+```cs
+string BuildString(int count)
+{
+    var initialBuffer = (stackalloc char[256]);
+    var builder = new DefaultInterpolatedStringHandler(0, 0, CultureInfo.InvariantCulture, initialBuffer);
+    builder.AppendLiteral("hello");
+    for (int i = 0; i < count; i++)
+    {
+        builder.AppendLiteral(", ");
+        builder.AppendFormatted(i);
+    }
+    
+    return builder.ToStringAndClear();
+}
+```
+
 ## Hashing a string
 
 To get a hexadecimal string representing the hash of a string, we'll use the `SHA256` algorithm (it could be replaced with others available in .NET).
