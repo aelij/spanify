@@ -78,7 +78,7 @@ class MyValueConverter : JsonConverter<MyValue>
 
 `Utf8Parser` and `Utf8Formatter` only work for [standard formats](https://learn.microsoft.com/en-us/dotnet/standard/base-types/formatting-types), specified using a single character (for example, `x` for hexadecimal numbers). If we want to use custom formats, we'll have to use methods that encode/decode UTF-16 `char`s rather than UTF-8 `byte`s. But fear not - we can still avoid most allocations.
 
-:bulb: :eight: `IUtf8SpanParseable` and `IUtf8SpanFormattable` can be used with custom formats.
+:bulb: :eight: `IUtf8SpanParsable` and `IUtf8SpanFormattable` can be used with custom formats.
 
 :warning: Do NOT use `ValueSpan` or `ValueSequence` directly to get **string data** from `Utf8JsonReader` - it may be not be well-formed, and may require unescaping. Use `CopyString` instead.
 
