@@ -244,3 +244,43 @@ static string GetSha256(this string s)
     return Convert.ToHexString(hash);
 }
 ```
+
+## :eight: Splitting strings
+
+`MemoryExtensions` methods `Split` and `SplitAny` allow us to split strings with no allocations. Unlike `String.Split`, it writes the results to a `Span<Range>`, which means we have to pre-allocate the ranges. If there are more matches than the ranges provide, the last range will contain the remainder of the string.
+
+:bulb: We're using collection expressions to create a `ReadOnlySpan<string>` of separators (of course, it can also be allocated statically once).
+
+```cs
+var stringToSplit = ";;11==22";
+var spanToSplit = stringToSplit.AsSpan();
+var ranges = (stackalloc Range[2]);
+ReadOnlySpan<string> separators = [ "==", ";;" ];
+var count = spanToSplit.SplitAny(ranges, separators, StringSplitOptions.RemoveEmptyEntries);
+Debug.Assert(count == 2);
+var result = (int.Parse(spanToSplit[ranges[0]]), int.Parse(spanToSplit[ranges[1]])); // results in (11, 22)
+```
+
+## :eight: Optimized value searches using `StringValues`
+
+Methods like `ContainsAny` and `IndexOfAny` can benefit from various optimizations, depending on the characters searched. For example, if the value contain only ASCII characters, or whether it's up to 5 characters, or represents a contiguous range (e.g. a-z). Determining the optimization is done once when `StringValues` is created.
+
+Many .NET classes, such as JSON parsing, regular expressions and `Uri` have been enhanced with it.
+
+```cs
+private static readonly SearchValues<char> s_lineEndings = SearchValues.Create("\n\r\f\u0085\u2028\u2029");
+
+int CountLineEndings(ReadOnlySpan<char> s)
+{
+    int count = 0;
+
+    int pos;
+    while ((pos = s.IndexOfAny(s_lineEndings)) >= 0)
+    {
+        count++;
+        s = s.Slice(pos + 1);
+    }
+
+    return count;
+}
+```

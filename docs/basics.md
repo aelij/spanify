@@ -63,7 +63,7 @@ var span = (stackalloc int[10]);
 
 :warning: Avoid using `stackalloc` inside loops. Allocate the memory outside the loop. The analyzer [CA2014](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/quality-rules/ca2014) provides a warning for this.
 
-:bulb: It's a bit more efficient to stackalloc a const length rather than a variable length.
+:bulb: It's a bit more efficient to `stackalloc` a const length rather than a variable length.
 
 :bulb: When allocating large blocks, using `[SkipLocalsInit]` to skip zeroing the stack memory can lead to a measurable improvement.
 
@@ -85,6 +85,58 @@ static string Reverse(string s)
     result.Span.Reverse();
     return result.Span.ToString();
 }
+```
+
+## :eight: Inline arrays and collection expressions
+
+**Inline arrays** are a C# 12 feature that allow defining `struct`s that are treated as arrays of a fixed size. Like any other `struct`, they can hold managed references, which means we can use them to allocate inline arrays of managed objects - either on the stack or on the heap as class members. The compiler also supports indexers, conversion to span and iteration using `foreach`.
+
+### Example: Using an inline array
+
+```cs
+class StringBuffer
+{
+    [InlineArray(10)]
+    private struct Buffer10
+    {
+        private string _s;
+    }
+
+    private int _count;
+    private Buffer10 _buffer;
+
+    public void Add(string s)
+    {
+        _buffer[_count++] = s; // indexer access
+    }
+
+    public void CopyTo(Span<string> target)
+    {
+        Span<string> source = _buffer; // implicit conversion to span
+        source[.._count].CopyTo(target);
+    }
+
+    public IEnumerator<string> GetEnumerator()
+    {
+        foreach (var item in _buffer) // iteration
+        {
+            yield return item;
+        }
+    }
+}
+```
+
+**Collection expressions** are an alternative, terse syntax C# 12 to initialize collections that also supports `Span<T>`, for which the compiler will (currently) generate an inline array type.
+
+Together they provide a powerful mechanism to allocate stack arrays of statically-known sizes. In C# 13 (probably), it will also be used to support `params Span<T>`.
+
+### Example: ContainsAny
+
+We can use collection expressions whenever a method accepts spans as parameters. For example, `MemoryExtensions.ContainsAny`.
+
+```cs
+ReadOnlySpan<string> strings = ["a", "b", "c"];
+strings.ContainsAny(["a", "d"]); // true
 ```
 
 ## Code analysis
