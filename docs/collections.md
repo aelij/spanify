@@ -4,9 +4,11 @@
 
 `CollectionsMarshal` provides **unsafe** access to a few of the basic collections.
 
-:warning: The reason these methods are not members of the collection classes is that they're unsafe. We recommend using them for performance-critical code.
+> [!IMPORTANT]
+> The reason these methods are not members of the collection classes is that they're unsafe. We recommend using them for performance-critical code.
 
-:warning: Do not modify the collection while using values returned from these methods, as they provide direct references to internal arrays, which can be replaced during various operations.
+> [!IMPORTANT]
+> Do not modify the collection while using values returned from these methods, as they provide direct references to internal arrays, which can be replaced during various operations.
 
 ### `List<T>`: `AsSpan`
 
@@ -28,7 +30,7 @@ static void Fill<T>(this List<T> list, T value) =>
     CollectionsMarshal.AsSpan(list).Fill(value);
 ```
 
-:eight: Shuffle a list:
+Shuffle a list:
 
 ```cs
 static void Shuffle<T>(this List<T> list) =>
@@ -54,7 +56,7 @@ Comparing it to `for` using BenchmarkDotNet shows nearly a x3 improvement:
 | MultiplySpan |   796.6 ns | 10.96 ns |  9.72 ns |
 |  MultiplyFor | 2,347.3 ns | 45.52 ns | 59.18 ns |
 
-### :eight: `List<T>`: `SetCount`
+### `List<T>`: `SetCount`
 
 `AsSpan` is limited as it cannot change the `Count` of the list. `SetCount` will expand or shrink the list's array to the desired size.
 

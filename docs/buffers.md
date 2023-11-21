@@ -10,15 +10,18 @@
 * `PooledArrayBufferWriter<T>` (from dotNext) - uses `ArrayPool<T>`.
 * `PipeWriter` - a `IBufferWriter<byte>` implementation that is used by `Pipe` and can convert from and to `Stream` (`PipeWriter.Create` and `PipeWriter.AsStream` methods, respectively.)
 
-:bulb: If we know the expected capacity, we can set it during initialization to minimize resizing.
+> [!TIP]
+> If we know the expected capacity, we can set it during initialization to minimize resizing.
 
 ### Example: JSON serialization and `Socket`
 
 As we don't know the size of the JSON string in advance, `IBufferWriter<byte>` allows allocating bytes as needed.
 
-:warning: As with any pooled object, returning the object is essential for performance. Like `MemoryRental`, returning in `PooledArrayBufferWriter` is implemented using the disposable pattern.
+> [!IMPORTANT]
+> As with any pooled object, returning the object is essential for performance. Like `MemoryRental`, returning in `PooledArrayBufferWriter` is implemented using the disposable pattern.
 
-:bulb: It's important to dispose the `Utf8JsonWriter` before using the buffer in order to flush all bytes.
+> [!TIP]
+> It's important to dispose the `Utf8JsonWriter` before using the buffer in order to flush all bytes.
 
 ```cs
 void SerializeToSocket<T>(Socket socket, T value)

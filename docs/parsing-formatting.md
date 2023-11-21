@@ -27,7 +27,8 @@ Instead of allocating a string, we can parse the UTF-8 value directly (similarly
 
 For writing values we'll use `stackalloc` to avoid the allocation, and the UTF-8 formatter to avoid going through `String`'s UTF-16.
 
-:warning: The following method will not work for values that require unescaping (for example, `\uXXXX`). We can use `CopyString` to get the unescaped string if needed.
+> [!IMPORTANT]
+> The following method will not work for values that require unescaping (for example, `\uXXXX`). We can use `CopyString` to get the unescaped string if needed.
 
 ```cs
 class MyValueConverter : JsonConverter<MyValue>
@@ -59,7 +60,8 @@ class MyValueConverter : JsonConverter<MyValue>
 
 We can call `JsonSerializer` with different options inside the converters to efficiently convert values.
 
-:warning: Make sure to instantiate `JsonSerializerOptions` only once, as it's used to cache serialization metadata.
+> [!IMPORTANT]
+> Make sure to instantiate `JsonSerializerOptions` only once, as it's used to cache serialization metadata.
 
 ```cs
 class MyValueConverter : JsonConverter<MyValue>
@@ -78,9 +80,11 @@ class MyValueConverter : JsonConverter<MyValue>
 
 `Utf8Parser` and `Utf8Formatter` only work for [standard formats](https://learn.microsoft.com/en-us/dotnet/standard/base-types/formatting-types), specified using a single character (for example, `x` for hexadecimal numbers). If we want to use custom formats, we'll have to use methods that encode/decode UTF-16 `char`s rather than UTF-8 `byte`s. But fear not - we can still avoid most allocations.
 
-:bulb: :eight: `IUtf8SpanParsable` and `IUtf8SpanFormattable` can be used with custom formats.
+> [!TIP]
+> `IUtf8SpanParsable` and `IUtf8SpanFormattable` can be used with custom formats.
 
-:warning: Do NOT use `ValueSpan` or `ValueSequence` directly to get **string data** from `Utf8JsonReader` - it may be not be well-formed, and may require unescaping. Use `CopyString` instead.
+> [!IMPORTANT]
+> Do NOT use `ValueSpan` or `ValueSequence` directly to get **string data** from `Utf8JsonReader` - it may be not be well-formed, and may require unescaping. Use `CopyString` instead.
 
 ```cs
 class DateTimeConverter : JsonConverter<DateTime>

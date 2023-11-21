@@ -33,7 +33,8 @@ BenchmarkDotnet results - note the reduction in allocated memory:
 
 When creating a new string whose size is known in advance, we can use the `String.Create` method to avoid additional allocations. This method works by allocating a string and providing a writable `Span` within a delegate. It's safe (meaning the string can't be mutated after creation) since the `Span` can't escape from the delegate.
 
-:warning: Avoid capturing variables in the delegate as they incur an allocation - pass all data using the `state` parameter. Use the `static` keyword to enforce this.
+> [!IMPORTANT]
+> Avoid capturing variables in the delegate as they incur an allocation - pass all data using the `state` parameter. Use the `static` keyword to enforce this.
 
 ### Example: Reversing a string
 
@@ -48,7 +49,8 @@ static string Reverse(this string s) =>
 
 ### Example: Creating a random string
 
-:bulb: :eight: Can be written using `RandomNumberGenerator.GetString(size, "abcdefghijklmnopqrstuvwxyz")`, which is also cryptographically secure.
+> [!TIP]
+> Can be written using `RandomNumberGenerator.GetString(size, "abcdefghijklmnopqrstuvwxyz")`, which is also cryptographically secure.
 
 ```cs
 static string GetRandomString(int size, char min = 'a', char max = 'z') =>
@@ -65,7 +67,8 @@ static string GetRandomString(int size, char min = 'a', char max = 'z') =>
 
 `ref struct`s such as `Span` can't be used in generic type parameters (since there's currently no way to prevent boxing), so if we want to base one string on another, we'll have to use `unsafe` code - a pointer - in order to pass it into the generic `SpanAction<T, TArg>` delegate.
 
-:warning: Be careful when using unsafe code - it could easily lead to memory corruption. Extensively cover it with tests.
+> [!IMPORTANT]
+> Be careful when using unsafe code - it could easily lead to memory corruption. Extensively cover it with tests.
 
 ```cs
 #pragma warning disable CS8500
@@ -132,13 +135,14 @@ Handlers available in .NET:
 * `DefaultInterpolatedStringHandler` is used in a `String.Create` overload, and emitted by the compiler for regular interpolated strings.
 * `AppendInterpolatedStringHandler` is used in `StringBuilder.Append`. No longer is it needed to break an interpolated string into multiple `Append` calls for efficiency.
 * `AssertInterpolatedStringHandler` and `WriteIfInterpolatedStringHandler` are used in `Debug.Assert` and `Debug.WriteIf` respectively and completely skip writing according to the condition argument.
-* `TryWriteInterpolatedStringHandler` is used by `MemoryExtensions.TryWrite` and allows us to efficiently write strings into a `Span<char>`. There's a similar one in :eight: `Utf8.TryWrite` to write into a `Span<byte>`.
+* `TryWriteInterpolatedStringHandler` is used by `MemoryExtensions.TryWrite` and allows us to efficiently write strings into a `Span<char>`. There's a similar one in `Utf8.TryWrite` to write into a `Span<byte>`.
 
 dotNext also includes:
 * `BufferWriterInterpolatedStringHandler` that writes into an `IBufferWriter<char>`.
 * `PoolingInterpolatedStringHandler` which allows using a `Memory<T>` pool rather than allocating new buffers.
 
-:bulb: We can reuse any of the above handlers to write custom ones.
+> [!TIP]
+> We can reuse any of the above handlers to write custom ones.
 
 ### Example: `TryWrite`
 
@@ -169,7 +173,8 @@ bool MatchesUriPattern(IEnumerable<Regex> patterns, Uri uri)
 
 Interpolated string handlers have overloads for `ReadOnlySpan<char>`, which allows us to get substrings without allocating new strings.
 
-:bulb: Consider `String.Create` and `String.Concat` before using an interpolated string, as they would be more efficient.
+> [!TIP]
+> Consider `String.Create` and `String.Concat` before using an interpolated string, as they would be more efficient.
 
 ```cs
 string Format(string str, int num)
@@ -183,11 +188,14 @@ string Format(string str, int num)
 
 `StringBuilder` is a reference type and often in order to avoid allocating new ones, we pool them, or store them in reusable thread-static fields. As an alternative, we can use `DefaultInterpolatedStringHandler` as an **append-only** value type string builder.
 
-:bulb: `StringBuilder` works more like a linked list of arrays while `DefaultInterpolatedStringHandler` works more like a dynamic array. This means that `StringBuilder` might perform better when we can't approximate the final size of the string.
+> [!TIP]
+> `StringBuilder` works more like a linked list of arrays while `DefaultInterpolatedStringHandler` works more like a dynamic array. This means that `StringBuilder` might perform better when we can't approximate the final size of the string.
 
-:bulb: When possible, it's preferable to use `stackalloc` to provide the initial buffer as it performs better. If we don't provide an initial buffer, it uses a rented array with a size calculated from the parameters `literalLength` and `formattedCount`.
+> [!TIP]
+> When possible, it's preferable to use `stackalloc` to provide the initial buffer as it performs better. If we don't provide an initial buffer, it uses a rented array with a size calculated from the parameters `literalLength` and `formattedCount`.
 
-:warning: The handler uses `ArrayPool<char>` internally when it grows out of the initial buffer, so we must call `ToStringAndClear` to return the rented array rather than `ToString`.
+> [!IMPORTANT]
+> The handler uses `ArrayPool<char>` internally when it grows out of the initial buffer, so we must call `ToStringAndClear` to return the rented array rather than `ToString`.
 
 ```cs
 string BuildString(int count)
@@ -209,7 +217,8 @@ string BuildString(int count)
 
 To get a hexadecimal string representing the hash of a string, we'll use the `SHA256` algorithm (it could be replaced with others available in .NET).
 
-:warning: The methods below will produce different hashes.
+> [!IMPORTANT]
+> The methods below will produce different hashes.
 
 ### Using `MemoryMarshal`
 
@@ -245,11 +254,12 @@ static string GetSha256(this string s)
 }
 ```
 
-## :eight: Splitting strings
+## Splitting strings
 
 `MemoryExtensions` methods `Split` and `SplitAny` allow us to split strings with no allocations. Unlike `String.Split`, it writes the results to a `Span<Range>`, which means we have to pre-allocate the ranges. If there are more matches than the ranges provide, the last range will contain the remainder of the string.
 
-:bulb: We're using collection expressions to create a `ReadOnlySpan<string>` of separators (of course, it can also be allocated statically once).
+> [!TIP]
+> We're using collection expressions to create a `ReadOnlySpan<string>` of separators (of course, it can also be allocated statically once).
 
 ```cs
 var stringToSplit = ";;11==22";
@@ -261,7 +271,7 @@ Debug.Assert(count == 2);
 var result = (int.Parse(spanToSplit[ranges[0]]), int.Parse(spanToSplit[ranges[1]])); // results in (11, 22)
 ```
 
-## :eight: Optimized value searches using `StringValues`
+## Optimized value searches using `StringValues`
 
 Methods like `ContainsAny` and `IndexOfAny` can benefit from various optimizations, depending on the characters searched. For example, if the value contain only ASCII characters, or whether it's up to 5 characters, or represents a contiguous range (e.g. a-z). Determining the optimization is done once when `StringValues` is created.
 

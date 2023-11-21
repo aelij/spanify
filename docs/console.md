@@ -4,7 +4,8 @@
 
 `Console.Write` methods use `System.String` which is UTF-16. In some scenarios we already have UTF-8 data that we want to write to the console (for example, JSON), and on some systems the default `Console.OutputStream` is UTF-8. It would be wasteful to allocate a string just to convert it back to UTF-8 bytes, so instead we can write the bytes directly to the output stream.
 
-:warning: It's up to the caller to ensure that the value is valid UTF-8. We could validate it using `Encoding.GetByteCount`, but it might be wasteful if the API used to produce the bytes already does that.
+> [!IMPORTANT]
+> It's up to the caller to ensure that the value is valid UTF-8. We could validate it using `Encoding.GetByteCount`, but it might be wasteful if the API used to produce the bytes already does that.
 
 ```cs
 public static class Utf8Console

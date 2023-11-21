@@ -4,9 +4,9 @@
 
 This repo demonstrates common usage patterns for some of those APIs.
 
-:warning: Always [benchmark](https://github.com/dotnet/BenchmarkDotNet) and test the code for correctness, especially when using low-level/unsafe APIs.
+> [!IMPORTANT]
+> Always [benchmark](https://github.com/dotnet/BenchmarkDotNet) and test the code for correctness, especially when using low-level/unsafe APIs.
 
-:eight: APIs marked with this icon are available in .NET 8. The rest are available in .NET 7.
 
 ## Table of contents
 
