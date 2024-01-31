@@ -153,7 +153,7 @@ The following method checks if the host & port part of a `Uri` matches a list of
 bool MatchesUriPattern(IEnumerable<Regex> patterns, Uri uri)
 {
     var maxLength = uri.Scheme.Length + "://".Length + uri.Host.Length + ":".Length + 5;
-    using MemoryRental<char> hostAndPort = maxLength <= 256 ? new(stackalloc char[256], maxLength) : new(maxLength);
+    using SpanOwner<char> hostAndPort = maxLength <= 256 ? new(stackalloc char[256], maxLength) : new(maxLength);
     hostAndPort.Span.TryWrite($"{uri.Scheme}://{uri.Host}:{uri.Port}", out var written);
     var hostAndPortSpan = hostAndPort.Span[..written];
 
@@ -237,7 +237,7 @@ static string GetSha256(this string s)
 
 ### UTF-8 encoding with `ArrayPool`
 
-UTF-8 encoding can produce a lower byte count for many strings, which would make the hash function faster. We'll use `MemoryRental` again to `stackalloc` or rent an array.
+UTF-8 encoding can produce a lower byte count for many strings, which would make the hash function faster. We'll use `SpanOwner` again to `stackalloc` or rent an array.
 
 ```cs
 const int StackallocThreshold = 256;
@@ -246,7 +246,7 @@ const int StackallocThreshold = 256;
 static string GetSha256(this string s)
 {
     int inputByteCount = Encoding.UTF8.GetByteCount(s);
-    using MemoryRental<byte> encodedBytes = inputByteCount <= StackallocThreshold ? new(stackalloc byte[StackallocThreshold], inputByteCount) : new(inputByteCount);
+    using SpanOwner<byte> encodedBytes = inputByteCount <= StackallocThreshold ? new(stackalloc byte[StackallocThreshold], inputByteCount) : new(inputByteCount);
     int encodedByteCount = Encoding.UTF8.GetBytes(s, encodedBytes.Span);
     var hash = (stackalloc byte[32]);
     SHA256.HashData(encodedBytes.Span[..encodedByteCount], hash);

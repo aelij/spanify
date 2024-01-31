@@ -21,8 +21,8 @@ The .NET documentation has a good introduction for `Span`:
 
 [dotNext](https://dotnet.github.io/dotNext) is a library with useful extensions for .NET. We'll use a few APIs from there to simplify the code.
 
-* `MemoryRental<T>` - `Span<T>`/`ArrayPool<T>` wrapper that returns the rented array to the pool when disposed
-* `PooledArrayBufferWriter<T>` - `IBufferWriter<T>` implementation that uses `ArrayPool<T>`
+* `SpanOwner<T>` (previous named `MemoryRental<T>`) - `Span<T>`/`ArrayPool<T>` wrapper that returns the rented array to the pool when disposed
+* `PoolingArrayBufferWriter<T>` (previous named `PooledArrayBufferWriter<T>`) - `IBufferWriter<T>` implementation that uses `ArrayPool<T>`
 
 ### `Span`-aware APIs
 
@@ -61,7 +61,7 @@ C# allows us to allocate arrays of [unmanaged types](https://learn.microsoft.com
 var span = (stackalloc int[10]);
 ```
 
-**Stack space is limited**, so we should only use this for small arrays (typically less than 1024 bytes) or we could end up with a stack overflow. If we don't know the size ahead of time, we'll need to set some threshold that would either incur an allocation or use some memory pooling option (for example, `ArrayPool<T>`). This leads to cumbersome code, as the code path that uses the rented memory also needs to return it to the pool. `MemoryRental<T>` (from dotNext) is a `ref struct` that abstracts this using the disposable pattern.
+**Stack space is limited**, so we should only use this for small arrays (typically less than 1024 bytes) or we could end up with a stack overflow. If we don't know the size ahead of time, we'll need to set some threshold that would either incur an allocation or use some memory pooling option (for example, `ArrayPool<T>`). This leads to cumbersome code, as the code path that uses the rented memory also needs to return it to the pool. `SpanOwner<T>` (from dotNext) is a `ref struct` that abstracts this using the disposable pattern.
 
 > [!IMPORTANT]
 > Avoid using `stackalloc` inside loops. Allocate the memory outside the loop. The analyzer [CA2014](https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/quality-rules/ca2014) provides a warning for this.
@@ -87,7 +87,7 @@ static string Reverse(string s)
     const int stackallocThreshold = 256;
 
     if (s.Length == 0) return s;
-    using MemoryRental<char> result = s.Length <= stackallocThreshold ? new(stackalloc char[stackallocThreshold], s.Length) : new(s.Length);
+    using SpanOwner<char> result = s.Length <= stackallocThreshold ? new(stackalloc char[stackallocThreshold], s.Length) : new(s.Length);
     s.AsSpan().CopyTo(result.Span);
     result.Span.Reverse();
     return result.Span.ToString();
@@ -156,7 +156,7 @@ strings.ContainsAny(["a", "d"]); // true
 </PropertyGroup>
 ```
 
-If this gets to noisy, we can enable only performance analyzers.
+If this gets too noisy, we can enable only performance analyzers.
 
 ```xml
 <PropertyGroup>
@@ -257,14 +257,14 @@ The following is also correct for the read-only counterparts.
 
 ### Getting the underlying array
 
-`Memory<T>` (unlike `Span<T>`) allows fetching the underlying array (if there is one) using `MemoryMarshal.TryGetArray<T>()`. This is useful when we need to pass the data to an API that accepts arrays.
+`Memory<T>` (unlike `Span<T>`) allows fetching the underlying array (if there is one) using `MemoryMarshal.TryGetArray<T>`. This is useful when we need to pass the data to an API that accepts arrays.
 
 > [!IMPORTANT]
 > Like many methods in the `System.Runtime.InteropServices` and the `System.Runtime.CompilerServices` namespaces, this method is considered unsafe, as it bypasses `ReadOnlyMemory<T>`'s immutability. It's advised to treat the returned array as read-only.
 
 #### Example: `BinaryData`
 
-`BinaryData` (from the `System.Memory.Data` package) has a `ToMemory()` method that's an $O(1)$ operation which does not copy data (a more fitting name would be `AsMemory`). However its `ToArray()` method is an $O(n)$ that does copy data. We can use `TryGetArray()` to avoid the copy.
+`BinaryData` (from the `System.Memory.Data` package) has a `ToMemory()` method that's an $O(1)$ operation which does not copy data (a more fitting name would be `AsMemory`). However its `ToArray()` method is an $O(n)$ operation that does copy data. We can use `TryGetArray()` to avoid the copy.
 
 ```cs
 var client = new BlobClient(...);

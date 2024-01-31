@@ -33,7 +33,7 @@ public static class StringExtensions
     public static string GetSha256(this ReadOnlySpan<char> s)
     {
         int inputByteCount = Encoding.UTF8.GetByteCount(s);
-        using MemoryRental<byte> encodedBytes = inputByteCount <= ByteStackallocThreshold ? new(stackalloc byte[ByteStackallocThreshold], inputByteCount) : new(inputByteCount);
+        using SpanOwner<byte> encodedBytes = inputByteCount <= ByteStackallocThreshold ? new(stackalloc byte[ByteStackallocThreshold], inputByteCount) : new(inputByteCount);
         int encodedByteCount = Encoding.UTF8.GetBytes(s, encodedBytes.Span);
         var hash = (stackalloc byte[32]);
         SHA256.HashData(encodedBytes.Span[..encodedByteCount], hash);

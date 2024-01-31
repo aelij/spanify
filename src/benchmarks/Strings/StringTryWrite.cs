@@ -38,7 +38,7 @@ public partial class StringTryWrite
     private static bool MatchesUriPatternSpan(IEnumerable<Regex> patterns, Uri uri)
     {
         var maxLength = uri.Scheme.Length + "://".Length + uri.Host.Length + ":".Length + 5;
-        using MemoryRental<char> hostAndPort = maxLength <= 256 ? new(stackalloc char[256], maxLength) : new(maxLength);
+        using SpanOwner<char> hostAndPort = maxLength <= 256 ? new(stackalloc char[256], maxLength) : new(maxLength);
         hostAndPort.Span.TryWrite($"{uri.Scheme}://{uri.Host}:{uri.Port}", out var written);
         var hostAndPortSpan = hostAndPort.Span[..written];
 

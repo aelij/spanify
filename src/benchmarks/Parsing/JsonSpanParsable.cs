@@ -70,7 +70,7 @@ public class JsonSpanParsable
         {
             var length = reader.HasValueSequence ? checked((int)reader.ValueSequence.Length) : reader.ValueSpan.Length;
             // allocate a buffer on the stack if possible, otherwise use array pool
-            using MemoryRental<char> chars = length <= StackallocThreshold ? new(stackalloc char[StackallocThreshold], length) : new(length);
+            using SpanOwner<char> chars = length <= StackallocThreshold ? new(stackalloc char[StackallocThreshold], length) : new(length);
             // copy the string data to the buffer, unescaping and validating it
             var written = reader.CopyString(chars.Span);
             // parse the date
