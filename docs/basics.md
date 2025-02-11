@@ -25,6 +25,12 @@ The .NET documentation has a good introduction for `Span`:
 * `PoolingArrayBufferWriter<T>` (previous named `PooledArrayBufferWriter<T>`) - `IBufferWriter<T>` implementation that uses `ArrayPool<T>`.
 * `Memory` - provides helper methods for allocating disposable `MemoryOwner<T>` from pools as well as constructing `ReadOnlySequence<T>` from a list of `Memory<T>` instances.
 
+### RecyclableMemoryStream
+
+* [Microsoft.IO.RecyclableMemoryStream](https://github.com/microsoft/Microsoft.IO.RecyclableMemoryStream) is a library that provides a memory stream implementation that relies on pooling to reduce allocations.
+* Implements `IBufferWriter<byte>`.
+* Can create a `ReadOnlySequence<byte>` from the stream.
+
 ### `Span`-aware APIs
 
 Many .NET classes have been enhanced with `Span` support (and the list keeps growing). Some of the notable ones:
