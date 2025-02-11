@@ -133,3 +133,29 @@ Comparing it to the original method using BenchmarkDotNet shows a x1.2 improveme
 |------------------------------ |---------:|---------:|---------:|---------:|
 | UnorderedSequenceEqualMarshal | 40.38 us | 0.533 us | 0.473 us | 40.50 us |
 |        UnorderedSequenceEqual | 48.16 us | 0.957 us | 2.019 us | 47.36 us |
+
+## Frozen collections
+
+The collections under the `System.Collections.Frozen` namespace are read-only and optimized for fast lookup and enumeration. Unlike immutable collections, there are no mutation methods that return a new collection; we can only provide the data during construction. They do have a few interesting performance features.
+
+* Since they are created using factories, they can be optimized according to the number of items.
+* The `GetAlternateLookup` method (in `FrozenDictionary` & `FrozenSet`) allows seeking keys using an alternate key type. The alternate key can be:
+  - A `ReadOnlySpan<char>` (if the key type is a `string`), which can be used to search the collection for a substring with no additional allocations.
+  - Any type created using the `Create` method of an `IAlternateEqualityComparer` passed to the collections's factory method.
+* The `GetValueRefOrNullRef` method (in `FrozenDictionary`), similar to the one from `CollectionsMarshal`, allows us to get a managed reference to the value. There is no `GetValueRefOrAddDefault` method, as the dictionary is read-only.
+
+### Example: Using `GetAlternateLookup`
+
+```cs
+var dictionary = FrozenDictionary.ToFrozenDictionary<string, int>(
+[
+    new("one", 1),
+    new("two", 2),
+    new("three", 3),
+]);
+
+var searchValue = "x-two";
+var searchValueSpan = searchValue.AsSpan()[2..];
+var alternateLookup = dictionary.GetAlternateLookup<ReadOnlySpan<char>>();
+alternateLookup.TryGetValue(searchValueSpan, out var value);
+```

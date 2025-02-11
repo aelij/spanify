@@ -63,9 +63,35 @@ static string GetRandomString(int size, char min = 'a', char max = 'z') =>
     });
 ```
 
-### Example: Passing a `Span<T>` to the `Create` method **(Advanced)**
+### Example: Passing a `Span<T>` to the `Create` method
 
-`ref struct`s such as `Span` can't be used in generic type parameters (since there's currently no way to prevent boxing), so if we want to base one string on another, we'll have to use `unsafe` code - a pointer - in order to pass it into the generic `SpanAction<T, TArg>` delegate.
+#### .NET 9+
+
+C# 13 introduces the `allows ref struct` generic anti-constraint, which allows us to pass a `Span<T>` to generic methods and types such as the `String.Create` method. Note we need to use a helper ref struct since `ValueTuple`s are not ones (and unfortunately there's no `ref struct record` yet).
+
+```cs
+public static string ReplaceNonAlphanumeric(this ReadOnlySpan<char> s, char replacement)
+{
+    return string.Create(s.Length, new ReplaceNonAlphanumericData(s, replacement), static (span, state) =>
+    {
+        for (int i = 0; i < state.S.Length; i++)
+        {
+            var c = state.S[i];
+            span[i] = char.IsLetterOrDigit(c) ? c : state.Replacement;
+        }
+    });
+}
+
+private readonly ref struct ReplaceNonAlphanumericData(ReadOnlySpan<char> s, char replacement)
+{
+    public readonly char Replacement = replacement;
+    public readonly ReadOnlySpan<char> S = s;
+}
+```
+
+#### .NET 8-
+
+`ref struct`s such as `Span` can't be used in generic type parameters in .NET 8 (since there was no way to prevent boxing), so if we want to base one string on another, we'll have to use `unsafe` code - a pointer - in order to pass it into the generic `SpanAction<T, TArg>` delegate.
 
 > [!IMPORTANT]
 > Be careful when using unsafe code - it could easily lead to memory corruption. Extensively cover it with tests.
@@ -265,11 +291,24 @@ static string GetSha256(this string s)
 var stringToSplit = ";;11==22";
 var spanToSplit = stringToSplit.AsSpan();
 var ranges = (stackalloc Range[2]);
-ReadOnlySpan<string> separators = [ "==", ";;" ];
-var count = spanToSplit.SplitAny(ranges, separators, StringSplitOptions.RemoveEmptyEntries);
+var count = spanToSplit.SplitAny(ranges, [ "==", ";;" ], StringSplitOptions.RemoveEmptyEntries);
 Debug.Assert(count == 2);
 var result = (int.Parse(spanToSplit[ranges[0]]), int.Parse(spanToSplit[ranges[1]])); // results in (11, 22)
 ```
+
+Another option is to use `SpanSplitEnumerator<T>`-returning methods, which allow us to **lazily** iterate over the results without preallocating storage for ranges. While it does not feature `StringSplitOptions`, it works for any span type, not just `char`.
+
+```cs
+var stringToSplit = "11==22"u8;
+foreach (var range in stringToSplit.Split((byte)'='))
+{
+    var span = stringToSplit[range];
+    // process span
+}
+```
+
+Finally, the `Regex.EnumerateSplits()` method provides the full power of the regular expression engine, works with `ReadOnlySpan<char>`, and also performs the matches lazily.
+
 
 ## Optimized value searches using `StringValues`
 
@@ -292,5 +331,38 @@ int CountLineEndings(ReadOnlySpan<char> s)
     }
 
     return count;
+}
+```
+
+## Fast, lazy, allocation-free regular expression matching
+
+The `Regex.Matches` method returns only when it found all matches of a pattern, and it's a relatively large object, consisting of nested `Groups` and `Captures` collections, which incurs a lot of allocations. If we need something leaner, we can use `Regex.EnumerateMatches` which returns a lazy enumerator of `ValueMatch` structs. It's amortized allocation-free and accepts `ReadOnlySpan<char>` as the input.
+
+However, the `ValueMatch` struct contains much less information - just the `Index` and `Length` of the match.  Most notably missing are groups. This can be sometimes circumvented by using lookahead/lookbehind assertions.
+
+### Example: Using `Regex.EnumerateMatches`
+
+```cs
+var pattern = @"(?<=text\s*)with";
+var builder = new StringBuilder();
+for (var i = 0; i < 1_000_000; i++)
+{
+    builder.Append(" sample text with matches ");
+}
+
+var inputSpan = builder.ToString().AsSpan();
+
+var count = 0;
+try
+{
+    foreach (var match in Regex.EnumerateMatches(inputSpan, pattern, RegexOptions.None, TimeSpan.FromMilliseconds(1)))
+    {
+        var matchSpan = inputSpan.Slice(match.Index, match.Length); // equals "with"
+        count++;
+    }
+}
+catch (TimeoutException)
+{
+    // handle timeout
 }
 ```

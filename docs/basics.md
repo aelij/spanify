@@ -21,21 +21,22 @@ The .NET documentation has a good introduction for `Span`:
 
 [dotNext](https://dotnet.github.io/dotNext) is a library with useful extensions for .NET. We'll use a few APIs from there to simplify the code.
 
-* `SpanOwner<T>` (previous named `MemoryRental<T>`) - `Span<T>`/`ArrayPool<T>` wrapper that returns the rented array to the pool when disposed
-* `PoolingArrayBufferWriter<T>` (previous named `PooledArrayBufferWriter<T>`) - `IBufferWriter<T>` implementation that uses `ArrayPool<T>`
+* `SpanOwner<T>` (previous named `MemoryRental<T>`) - `Span<T>`/`ArrayPool<T>` wrapper that returns the rented array to the pool when disposed.
+* `PoolingArrayBufferWriter<T>` (previous named `PooledArrayBufferWriter<T>`) - `IBufferWriter<T>` implementation that uses `ArrayPool<T>`.
+* `Memory` - provides helper methods for allocating disposable `MemoryOwner<T>` from pools as well as constructing `ReadOnlySequence<T>` from a list of `Memory<T>` instances.
 
 ### `Span`-aware APIs
 
 Many .NET classes have been enhanced with `Span` support (and the list keeps growing). Some of the notable ones:
 
-* Text: `String`, `StringBuilder`, `Regex`, `Encoding`, `Ascii`, `Utf8`
-* Formatting: `Utf8Formatter`, `Utf8Parser`, `BinaryPrimitives`, `BitConverter`, `Base64`
+* Text: `String`, `StringBuilder`, `Regex`, `Encoding`, `Ascii`, `Utf8`, `Base64Url`
+* Formatting: `Utf8Formatter`, `Utf8Parser`, `BinaryPrimitives`, `BitConverter`, `Base64`, `Convert`
 * Value types (for example, `Int32`) implementing `ISpanFormattable`, `ISpanParseable`, `IUtf8SpanFormattable`, `IUtf8SpanParsable`
 * Cryptography: `RandomNumberGenerator`, `HashAlgorithm`, `AsymmetricAlgorithm`, `SymmetricAlgorithm` `X509Certificate`
-* IO: `Path`, `FileSystemEntry`
+* IO: `Path`, `FileSystemEntry`, `File`, `FileStream`, `TextWriter`
 * Streams and networking: `Socket`, `Stream`, `StreamReader`
 
-Additionally, `MemoryExtensions` has many extension methods.
+Additionally, `MemoryExtensions` has many extension methods for spans.
 
 When using APIs that accept **arrays or strings**, look for `Span`-based alternatives.
 
@@ -135,7 +136,7 @@ class StringBuffer
 
 **Collection expressions** are an alternative, terse syntax C# 12 to initialize collections that also supports `Span<T>`, for which the compiler will (currently) generate an inline array type.
 
-Together they provide a powerful mechanism to allocate stack arrays of statically-known sizes. In C# 13 (probably), it will also be used to support `params Span<T>`.
+Together they provide a powerful mechanism to allocate stack arrays of statically-known sizes. In C# 13 it is also used to support `params Span<T>`.
 
 ### Example: ContainsAny
 
@@ -247,7 +248,7 @@ The following is also correct for the read-only counterparts.
 | Storage | Stack only (`ref struct`) | Stack and heap |
 | Supports | Arrays, pointers, managed references (`ref`) | Arrays, custom using `MemoryManager<T>` |
 | Async/iterator/nested methods | No | Yes |
-| Generic type parameters | No | Yes |
+| Generic type parameters | Yes - with `allows ref struct` | Yes |
 | Composition | Pointer and length | Object, length and index |
 | Conversion | - | `AsSpan` |
 | Performance | More efficient | Less efficient |

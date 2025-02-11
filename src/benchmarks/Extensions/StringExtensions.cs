@@ -14,20 +14,23 @@ public static class StringExtensions
             span.Reverse();
         });
 
-#pragma warning disable CS8500
-    public unsafe static string ReplaceNonAlphanumeric(this ReadOnlySpan<char> s, char replacement)
+    public static string ReplaceNonAlphanumeric(this ReadOnlySpan<char> s, char replacement)
     {
-        return string.Create(s.Length, (replacement, spanPtr: (IntPtr)(&s)), static (span, state) =>
+        return string.Create(s.Length, new ReplaceNonAlphanumericData(s, replacement), static (span, state) =>
         {
-            var sourceSpan = *(ReadOnlySpan<char>*)state.spanPtr;
-            for (int i = 0; i < span.Length; i++)
+            for (int i = 0; i < state.S.Length; i++)
             {
-                var c = sourceSpan[i];
-                span[i] = char.IsLetterOrDigit(c) ? c : state.replacement;
+                var c = state.S[i];
+                span[i] = char.IsLetterOrDigit(c) ? c : state.Replacement;
             }
         });
     }
-#pragma warning restore CS8500
+
+    private readonly ref struct ReplaceNonAlphanumericData(ReadOnlySpan<char> s, char replacement)
+    {
+        public readonly char Replacement = replacement;
+        public readonly ReadOnlySpan<char> S = s;
+    }
 
     [SkipLocalsInit]
     public static string GetSha256(this ReadOnlySpan<char> s)

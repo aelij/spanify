@@ -22,5 +22,5 @@ public class StringReplaceNonAlphanumeric
     }
 
     [Benchmark(Baseline = true)]
-    public unsafe string ReplaceSpan() => text.AsSpan().ReplaceNonAlphanumeric(replacement); // from StringExtensions
+    public string ReplaceSpan() => text.AsSpan().ReplaceNonAlphanumeric(replacement); // from StringExtensions
 }
