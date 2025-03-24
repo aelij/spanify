@@ -139,10 +139,15 @@ Comparing it to the original method using BenchmarkDotNet shows a x1.2 improveme
 The collections under the `System.Collections.Frozen` namespace are read-only and optimized for fast lookup and enumeration. Unlike immutable collections, there are no mutation methods that return a new collection; we can only provide the data during construction. They do have a few interesting performance features.
 
 * Since they are created using factories, they can be optimized according to the number of items.
-* The `GetAlternateLookup` method (in `FrozenDictionary` & `FrozenSet`) allows seeking keys using an alternate key type. The alternate key can be:
-  - A `ReadOnlySpan<char>` (if the key type is a `string`), which can be used to search the collection for a substring with no additional allocations.
-  - Any type created using the `Create` method of an `IAlternateEqualityComparer` passed to the collections's factory method.
+* `GetAlternateLookup` method (see below).
 * The `GetValueRefOrNullRef` method (in `FrozenDictionary`), similar to the one from `CollectionsMarshal`, allows us to get a managed reference to the value. There is no `GetValueRefOrAddDefault` method, as the dictionary is read-only.
+
+## `GetAlternateLookup` in sets and dictionaries
+
+* The `GetAlternateLookup` method allows seeking keys using an alternate key type. The alternate key can be:
+  - A `ReadOnlySpan<char>` (if the key type is a `string`), which can be used to search the collection for a substring with no additional allocations.
+  - Any type created using the `Create` method of an `IAlternateEqualityComparer` configured as the collection's `IEqualityComparer`.
+* Available in `HashSet`, `FrozenSet`, `Dictionary`, `FrozenDictionary`, and `ConcurrentDictionary`.
 
 ### Example: Using `GetAlternateLookup`
 
