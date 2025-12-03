@@ -239,6 +239,45 @@ string BuildString(int count)
 }
 ```
 
+### Example: Using `Text` and `Clear()`
+
+* `Text` property - returns a `ReadOnlySpan<char>` of the current content, useful for inspecting the buffer without creating a string.
+* `Clear()` method - resets the handler for reuse, avoiding re-allocation.
+
+```cs
+var buffer = (stackalloc char[256]);
+var handler = new DefaultInterpolatedStringHandler(0, 0, CultureInfo.InvariantCulture, buffer);
+
+handler.AppendLiteral("Hello");
+Console.WriteLine(handler.Text.Length); // 5
+
+handler.Clear();
+handler.AppendLiteral("World");
+var result = handler.ToStringAndClear(); // "World"
+```
+
+## Span searches with custom comparers
+
+`MemoryExtensions` has overloads for many search methods that accept an `IEqualityComparer<T>`. This enables custom equality logic for span operations like `IndexOf`, `Contains`, `Count`, and more.
+
+```cs
+var comparer = StringComparer.OrdinalIgnoreCase;
+ReadOnlySpan<string> names = ["Alice", "Bob", "Charlie"];
+
+// Case-insensitive search
+names.Contains("alice", comparer); // true
+names.IndexOf("BOB", comparer); // 1
+names.Count("charlie", comparer); // 1
+```
+
+This also works for `StartsWith`, `EndsWith`, `SequenceEqual`, and the `*Any`/`*Except` variants:
+
+```cs
+ReadOnlySpan<string> values = ["Hello", "World", "hello"];
+values.ContainsAny(["HELLO", "WORLD"], StringComparer.OrdinalIgnoreCase); // true
+values.IndexOfAnyExcept(["hello"], StringComparer.OrdinalIgnoreCase); // 1 ("World")
+```
+
 ## Hashing a string
 
 To get a hexadecimal string representing the hash of a string, we'll use the `SHA256` algorithm (it could be replaced with others available in .NET).
@@ -310,7 +349,7 @@ foreach (var range in stringToSplit.Split((byte)'='))
 Finally, the `Regex.EnumerateSplits()` method provides the full power of the regular expression engine, works with `ReadOnlySpan<char>`, and also performs the matches lazily.
 
 
-## Optimized value searches using `StringValues`
+## Optimized value searches using `SearchValues`
 
 Methods like `ContainsAny` and `IndexOfAny` can benefit from various optimizations, depending on the characters searched. For example, if the value contain only ASCII characters, or whether it's up to 5 characters, or represents a contiguous range (e.g. a-z). Determining the optimization is done once when `StringValues` is created.
 

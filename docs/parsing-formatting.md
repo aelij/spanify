@@ -114,3 +114,32 @@ class DateTimeConverter : JsonConverter<DateTime>
     }
 }
 ```
+
+## Writing large strings in segments
+
+When writing large string values to JSON, we may want to avoid buffering the entire content in memory. `Utf8JsonWriter` provides segment-writing methods that allow streaming content in chunks:
+
+* `WriteStringValueSegment` - writes a portion of a string value (UTF-8 or UTF-16)
+* `WriteBase64StringSegment` - writes a portion of base64-encoded binary data
+
+The `isFinalSegment` parameter indicates when the value is complete.
+
+```cs
+void WriteLargeString(Utf8JsonWriter writer, IEnumerable<ReadOnlyMemory<byte>> chunks)
+{
+    bool isFirst = true;
+    ReadOnlyMemory<byte> lastChunk = default;
+    
+    foreach (var chunk in chunks)
+    {
+        if (!isFirst)
+        {
+            writer.WriteStringValueSegment(lastChunk.Span, isFinalSegment: false);
+        }
+        lastChunk = chunk;
+        isFirst = false;
+    }
+    
+    writer.WriteStringValueSegment(lastChunk.Span, isFinalSegment: true);
+}
+```

@@ -21,8 +21,8 @@ The .NET documentation has a good introduction for `Span`:
 
 [dotNext](https://dotnet.github.io/dotNext) is a library with useful extensions for .NET. We'll use a few APIs from there to simplify the code.
 
-* `SpanOwner<T>` (previous named `MemoryRental<T>`) - `Span<T>`/`ArrayPool<T>` wrapper that returns the rented array to the pool when disposed.
-* `PoolingArrayBufferWriter<T>` (previous named `PooledArrayBufferWriter<T>`) - `IBufferWriter<T>` implementation that uses `ArrayPool<T>`.
+* `SpanOwner<T>` (previously named `MemoryRental<T>`) - `Span<T>`/`ArrayPool<T>` wrapper that returns the rented array to the pool when disposed.
+* `PoolingArrayBufferWriter<T>` (previously named `PooledArrayBufferWriter<T>`) - `IBufferWriter<T>` implementation that uses `ArrayPool<T>`.
 * `Memory` - provides helper methods for allocating disposable `MemoryOwner<T>` from pools as well as constructing `ReadOnlySequence<T>` from a list of `Memory<T>` instances.
 
 ### RecyclableMemoryStream

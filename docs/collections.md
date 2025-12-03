@@ -99,7 +99,7 @@ bool UnorderedSequenceEqual<T>(IEnumerable<T> a, IEnumerable<T> b) where T : not
 }
 ```
 
-Using `CollectionMarshal` we can reduce the number of lookups to one per iteration. We use `Unsafe.IsNullRef` to check if the returned `ref T` is null (which, in this case, means the value was not found).
+Using `CollectionsMarshal` we can reduce the number of lookups to one per iteration. We use `Unsafe.IsNullRef` to check if the returned `ref T` is null (which, in this case, means the value was not found).
 
 ```cs
 bool UnorderedSequenceEqual<T>(IEnumerable<T> a, IEnumerable<T> b) where T : notnull
@@ -133,6 +133,22 @@ Comparing it to the original method using BenchmarkDotNet shows a x1.2 improveme
 |------------------------------ |---------:|---------:|---------:|---------:|
 | UnorderedSequenceEqualMarshal | 40.38 us | 0.533 us | 0.473 us | 40.50 us |
 |        UnorderedSequenceEqual | 48.16 us | 0.957 us | 2.019 us | 47.36 us |
+
+### `BitArray`: `AsBytes`
+
+Returns a `Span<byte>` over the internal storage of a `BitArray`. This enables efficient bulk operations on bit data.
+
+```cs
+var bits = new BitArray(64);
+bits[0] = true;
+bits[8] = true;
+
+Span<byte> bytes = CollectionsMarshal.AsBytes(bits);
+// bytes[0] = 0b00000001, bytes[1] = 0b00000001, rest are 0
+
+// Efficient bulk operations
+bytes.Fill(0xFF); // Set all bits to 1
+```
 
 ## Frozen collections
 
