@@ -10,7 +10,7 @@ public partial class StringTryWrite
     [GeneratedRegex("^https?://(www\\.)?github\\.com(:\\d+)?$", RegexOptions.Compiled)]
     private static partial Regex GitHubUrlMatcher();
 
-    private static IReadOnlyList<Regex> patterns = new[] { GitHubUrlMatcher() };
+    private static IReadOnlyList<Regex> patterns = [GitHubUrlMatcher()];
 
     [Benchmark]
     public bool MatchesUriPatternNaive() => MatchesUriPatternNaive(patterns, uri);

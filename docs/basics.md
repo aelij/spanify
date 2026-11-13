@@ -103,7 +103,7 @@ static string Reverse(string s)
 
 ## Inline arrays and collection expressions
 
-**Inline arrays** are a C# 12 feature that allow defining `struct`s that are treated as arrays of a fixed size. Like any other `struct`, they can hold managed references, which means we can use them to allocate inline arrays of managed objects - either on the stack or on the heap as class members. The compiler also supports indexers, conversion to span and iteration using `foreach`.
+**Inline arrays** allow defining `struct`s that are treated as arrays of a fixed size. Like any other `struct`, they can hold managed references, which means we can use them to allocate inline arrays of managed objects - either on the stack or on the heap as class members. The compiler also supports indexers, conversion to span and iteration using `foreach`.
 
 ### Example: Using an inline array
 
@@ -140,9 +140,9 @@ class StringBuffer
 }
 ```
 
-**Collection expressions** are an alternative, terse syntax C# 12 to initialize collections that also supports `Span<T>`, for which the compiler will (currently) generate an inline array type.
+**Collection expressions** are an alternative, terse syntax to initialize collections that also supports `Span<T>`, for which the compiler can generate an inline array type.
 
-Together they provide a powerful mechanism to allocate stack arrays of statically-known sizes. In C# 13 it is also used to support `params Span<T>`.
+Together they provide a powerful mechanism to allocate stack arrays of statically-known sizes. They also support `params Span<T>`.
 
 ### Example: ContainsAny
 
@@ -152,6 +152,48 @@ We can use collection expressions whenever a method accepts spans as parameters.
 ReadOnlySpan<string> strings = ["a", "b", "c"];
 strings.ContainsAny(["a", "d"]); // true
 ```
+
+## Runtime optimizations
+
+The JIT performs several memory-related optimizations. They depend on inlining, code shape and compilation mode, so they aren't guaranteed - code shouldn't rely on them, and explicit `stackalloc` remains the way to guarantee stack memory.
+
+* **Struct promotion** - places the fields of struct locals and arguments in registers rather than in stack memory, regardless of the number or kind of fields.
+* **Address exposure tracking** - taking a local's address (for example, passing it by `ref` to a method that isn't inlined) inhibits optimizations such as promotion; the JIT avoids unnecessary exposure, but keep hot locals free of address-taking where possible.
+* **Unrolled memory operations** - memory operations such as comparison, copying and zeroing can be unrolled and auto-vectorized with SIMD when their sizes can be determined at compile time. `string.Equals` and `SequenceEqual` over two constants fold to the result.
+* **Bounds-check elimination** - checks proven redundant are removed: in loops bounded by the length (including `i + constant < length`), for index-from-end access such as `values[^1]`, and on `span[0]` after an `IsEmpty` check. Prefer clear, safe span code before reaching for `Unsafe`.
+* **Thread-static access** - access to `[ThreadStatic]` fields is optimized, making them a cheap option for per-thread caches such as reusable buffers.
+* **Runtime async** - when enabled using `<Features>runtime-async=on</Features>`, async methods reuse continuation objects, avoid saving unchanged locals and avoid allocations in `await Task.Yield()`. Independently, continuations skip `ExecutionContext` capture when no `AsyncLocal<T>` state is in use.
+
+### Stack allocation of objects
+
+The JIT can allocate an object on the stack rather than the GC heap when *escape analysis* proves it doesn't outlive its method. An object escapes when it's stored in a non-local location (such as a field) or passed to a method that isn't inlined. Stack-allocated objects aren't tracked by the GC, and the JIT may go further and replace an object with its scalar values.
+
+Candidates include:
+
+* **Boxes** - value types boxed to `object` or an interface, for example when passed to an inlined method.
+* **Small, fixed-size arrays** - of both value types and reference types.
+* **Objects referenced by local struct fields** - as long as the struct itself doesn't escape.
+* **Delegates** - a delegate that's only invoked locally. The closure holding captured variables is still heap-allocated.
+* **Enumerators** - for example, enumerating an array via `IEnumerable<T>`, enabled by devirtualization and conditional escape analysis.
+
+```cs
+static int Sum()
+{
+    int[] numbers = { 1, 2, 3 }; // small, constant size, doesn't escape
+    int sum = 0;
+    foreach (var number in numbers)
+    {
+        sum += number;
+    }
+
+    return sum;
+}
+```
+
+Since passing an object to a non-inlined call makes it escape, devirtualization and inlining are what make many allocations eligible. Keep temporary objects local to hot methods to benefit, and confirm the effect with BenchmarkDotNet's `[MemoryDiagnoser]`.
+
+> [!IMPORTANT]
+> Benchmarks should use representative runtime inputs: comparisons between literals may be optimized away entirely. Measure on the actual deployment runtime and hardware; JIT, ReadyToRun and NativeAOT results can differ.
 
 ## Code analysis
 
@@ -253,12 +295,14 @@ The following is also correct for the read-only counterparts.
 | --- | --- | --- |
 | Storage | Stack only (`ref struct`) | Stack and heap |
 | Supports | Arrays, pointers, managed references (`ref`) | Arrays, custom using `MemoryManager<T>` |
-| Async/iterator/nested methods | No | Yes |
+| Async/iterator methods | In synchronous regions; not across `await` / `yield` | Yes |
 | Generic type parameters | Yes - with `allows ref struct` | Yes |
 | Composition | Pointer and length | Object, length and index |
 | Conversion | - | `AsSpan` |
 | Performance | More efficient | Less efficient |
 | Ownership | Stack | `IMemoryOwner<T>` |
+
+`Span<T>` cannot be captured by a lambda or local function. Runtime-native async does not remove these lifetime restrictions; use `Memory<T>` when a buffer must survive an `await`.
 
 ## Working with `Memory<T>`
 

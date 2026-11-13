@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Buffers.Text;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BenchmarkDotNet.Configs;
@@ -11,8 +10,9 @@ using BenchmarkDotNet.Configs;
 public class JsonUtf8
 {
     private const int ElementCount = 1000;
-    private static readonly ReadOnlyMemory<byte> json = Encoding.UTF8.GetBytes('[' + string.Join(",", Enumerable.Repeat("""{"Value":"42"}""", ElementCount)) + ']');
-    private static readonly MyContainer[] containers = Enumerable.Repeat(new MyContainer(new MyValue(42)), ElementCount).ToArray();
+    private const long Value = 1234567890123456789;
+    private ReadOnlyMemory<byte> json;
+    private MyContainer[] containers = [];
 
     private static readonly JsonSerializerOptions s_naiveOptions = new()
     {
@@ -23,6 +23,13 @@ public class JsonUtf8
     {
         Converters = { new MyValueConverter() }
     };
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        containers = Enumerable.Repeat(new MyContainer(new MyValue(Value)), ElementCount).ToArray();
+        json = JsonSerializer.SerializeToUtf8Bytes(containers, s_naiveOptions);
+    }
 
     [Benchmark, BenchmarkCategory("Serialize")]
     public void SerializeUtf16()

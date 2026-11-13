@@ -52,3 +52,46 @@ using (var stream = manager.GetStream())
     stream.Advance(bytesWritten);
 }
 ```
+
+## In-memory stream adapters
+
+When an API requires `Stream`, adapters let us expose existing memory without copying it into a `MemoryStream` or flattening a sequence with `ToArray()`:
+
+| Adapter | Input | Use |
+| --- | --- | --- |
+| `System.IO.ReadOnlyMemoryStream` | `ReadOnlyMemory<byte>` | Read existing contiguous bytes |
+| `System.IO.WritableMemoryStream` | `Memory<byte>` | Read/write a fixed-capacity buffer |
+| `System.Buffers.ReadOnlySequenceStream` | `ReadOnlySequence<byte>` | Read segmented bytes without flattening |
+| `System.IO.StringStream` | `string` or `ReadOnlyMemory<char>`, plus an `Encoding` | Encode text as it is read, without an intermediate encoded `byte[]` |
+
+```cs
+static async Task CopySequenceAsync(
+    ReadOnlySequence<byte> source, Stream destination, CancellationToken cancellationToken)
+{
+    using var stream = new ReadOnlySequenceStream(source);
+    await stream.CopyToAsync(destination, cancellationToken);
+}
+```
+
+The adapter objects still allocate, but avoid the intermediate data copy. `WritableMemoryStream` cannot grow beyond the supplied memory; use a growable or pooled writer when the output size is unknown.
+
+> [!IMPORTANT]
+> These adapters do not take ownership of the backing memory. Keep it valid until the consumer has finished. In particular, do not return a rented array or advance a `PipeReader` past a sequence while its stream is still in use.
+
+## Span-based compression
+
+`System.IO.Compression` provides `DeflateEncoder` / `DeflateDecoder`, `ZLibEncoder` / `ZLibDecoder`, and `GZipEncoder` / `GZipDecoder`. Like the Brotli APIs, they compress/decompress spans without wrapping buffers in streams:
+
+```cs
+ReadOnlySpan<byte> source = "span span span"u8;
+Span<byte> destination = stackalloc byte[128];
+if (!GZipEncoder.TryCompress(source, destination, out int bytesWritten))
+{
+    throw new InvalidOperationException("Compression destination is too small.");
+}
+
+ReadOnlySpan<byte> compressed = destination[..bytesWritten];
+```
+
+> [!TIP]
+> Use `GetMaxCompressedLength` to size the destination. For streaming data, use the instance `Compress`/`Decompress` methods, and `Reset()` to reuse an encoder or decoder. `ZstandardEncoder` / `ZstandardDecoder` provide the same pattern for Zstandard.

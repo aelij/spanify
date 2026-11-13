@@ -7,7 +7,7 @@ public static class StringExtensions
 {
     private const int ByteStackallocThreshold = 256;
 
-    public static string Reverse(this string s) =>
+    public static string ReverseString(this string s) =>
         string.Create(s.Length, s, static (span, str) =>
         {
             str.AsSpan().CopyTo(span);

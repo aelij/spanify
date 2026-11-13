@@ -4,8 +4,8 @@ public class StringReverse
     const string text = "abcdefghijklmnopqrstuvwxyz";
 
     [Benchmark]
-    public string ReverseNaive() => new(text.Reverse().ToArray());
+    public string ReverseNaive() => new([.. text.Reverse()]);
 
     [Benchmark(Baseline = true)]
-    public string ReverseStringCreate() => text.Reverse(); // from StringExtensions
+    public string ReverseStringCreate() => text.ReverseString();
 }

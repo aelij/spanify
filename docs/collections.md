@@ -16,12 +16,28 @@
 
 By using `AsSpan` we can get a slice of that array that only contains the `Count` items in the list. This can both improve performance in some cases, and is useful if we want to pass the list to `Span`-based APIs without copying the data.
 
-For example, we can use `MemoryExtensions.SequenceEqual` to compare two lists fast:
+For example, we can compare the first `count` elements of two lists. With LINQ:
 
 ```cs
-static bool SequenceEqual<T>(this List<T> listA, List<T> listB) =>
-    CollectionsMarshal.AsSpan(listA).SequenceEqual(CollectionsMarshal.AsSpan(listB));
+listA.Take(count).SequenceEqual(listB.Take(count));
 ```
+
+Using span slices avoids the LINQ iterator wrappers:
+
+```cs
+static bool SequenceEqual<T>(this List<T> listA, List<T> listB, int count) =>
+    CollectionsMarshal.AsSpan(listA).Take(count).SequenceEqual(CollectionsMarshal.AsSpan(listB).Take(count));
+
+static Span<T> Take<T>(this Span<T> span, int count) =>
+    span[..Math.Clamp(count, 0, span.Length)];
+```
+
+Comparing the first 1,000 elements of 10,000-element lists using BenchmarkDotNet shows about a 23.6x speedup:
+
+| Method                     | Mean        | Error     | StdDev    | Ratio |
+|--------------------------- |------------:|----------:|----------:|------:|
+| ListPrefixEqualsEnumerable | 2,103.60 ns | 12.930 ns | 11.462 ns | 23.63 |
+| ListPrefixEqualsSpan       |    89.02 ns |  0.405 ns |  0.359 ns |  1.00 |
 
 The `Span` is writable, so we can use it to modify the list:
 
@@ -29,6 +45,13 @@ The `Span` is writable, so we can use it to modify the list:
 static void Fill<T>(this List<T> list, T value) =>
     CollectionsMarshal.AsSpan(list).Fill(value);
 ```
+
+BenchmarkDotNet results for filling a list of 10,000 integers:
+
+| Method        | Mean       | Error    | StdDev   | Ratio |
+|-------------- |-----------:|---------:|---------:|------:|
+| ListFillNaive | 4,034.4 ns | 27.66 ns | 21.60 ns |  6.62 |
+| ListFillSpan  |   609.5 ns |  9.60 ns |  8.98 ns |  1.00 |
 
 Shuffle a list:
 
@@ -49,12 +72,12 @@ static void Multiply<T>(this List<T> list, T factor) where T : struct, INumber<T
 }
 ```
 
-Comparing it to `for` using BenchmarkDotNet shows nearly a x3 improvement:
+Comparing it to `for` using BenchmarkDotNet shows about a 1.9x speedup for 10,000 integers multiplied by 41:
 
-|       Method |       Mean |    Error |   StdDev |
-|------------- |-----------:|---------:|---------:|
-| MultiplySpan |   796.6 ns | 10.96 ns |  9.72 ns |
-|  MultiplyFor | 2,347.3 ns | 45.52 ns | 59.18 ns |
+| Method           | Mean     | Error     | StdDev    | Ratio |
+|----------------- |---------:|----------:|----------:|------:|
+| ListMultiplyFor  | 5.053 us | 0.0071 us | 0.0059 us |  1.94 |
+| ListMultiplySpan | 2.605 us | 0.0037 us | 0.0033 us |  1.00 |
 
 ### `List<T>`: `SetCount`
 
@@ -80,7 +103,7 @@ Consider the following code - in each loop we're doing two lookups, one to retri
 ```cs
 bool UnorderedSequenceEqual<T>(IEnumerable<T> a, IEnumerable<T> b) where T : notnull
 {
-    var counts = new Dictionary<T, int>();
+    var counts = new Dictionary<T, int>(a.TryGetNonEnumeratedCount(out var capacity) ? capacity : 0);
 
     foreach (var item in a)
     {
@@ -95,7 +118,15 @@ bool UnorderedSequenceEqual<T>(IEnumerable<T> a, IEnumerable<T> b) where T : not
         counts[item] = value - 1;
     }
 
-    return counts.All(kv => kv.Value == 0);
+    foreach (var item in counts)
+    {
+        if (item.Value != 0)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 ```
 
@@ -104,7 +135,7 @@ Using `CollectionsMarshal` we can reduce the number of lookups to one per iterat
 ```cs
 bool UnorderedSequenceEqual<T>(IEnumerable<T> a, IEnumerable<T> b) where T : notnull
 {
-    var counts = new Dictionary<T, int>();
+    var counts = new Dictionary<T, int>(a.TryGetNonEnumeratedCount(out var capacity) ? capacity : 0);
 
     foreach (var item in a)
     {
@@ -122,17 +153,24 @@ bool UnorderedSequenceEqual<T>(IEnumerable<T> a, IEnumerable<T> b) where T : not
         count--;
     }
 
-    // for true high-performance code, replace LINQ with a loop
-    return counts.All(kv => kv.Value == 0);
+    foreach (var item in counts)
+    {
+        if (item.Value != 0)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 ```
 
-Comparing it to the original method using BenchmarkDotNet shows a x1.2 improvement:
+The benchmark compares lists of 10,000 long strings with 1,000 distinct keys, with the second list reversed. BenchmarkDotNet shows about a 1.75x speedup for this workload:
 
-|                        Method |     Mean |    Error |   StdDev |   Median |
-|------------------------------ |---------:|---------:|---------:|---------:|
-| UnorderedSequenceEqualMarshal | 40.38 us | 0.533 us | 0.473 us | 40.50 us |
-|        UnorderedSequenceEqual | 48.16 us | 0.957 us | 2.019 us | 47.36 us |
+| Method                      | Mean     | Error   | StdDev  | Ratio |
+|---------------------------- |---------:|--------:|--------:|------:|
+| UnorderedSequenceEqualNaive | 864.6 us | 2.13 us | 1.78 us |  1.75 |
+| UnorderedSequenceEqualRef   | 495.0 us | 2.20 us | 1.84 us |  1.00 |
 
 ### `BitArray`: `AsBytes`
 
@@ -149,6 +187,18 @@ Span<byte> bytes = CollectionsMarshal.AsBytes(bits);
 // Efficient bulk operations
 bytes.Fill(0xFF); // Set all bits to 1
 ```
+
+## `BitArray` construction and counting
+
+Constructors accept `ReadOnlySpan<bool>`, `ReadOnlySpan<byte>` or `ReadOnlySpan<int>`, avoiding an intermediate `ToArray()` when the input is a slice or stack buffer. `PopCount()` counts set bits without a manual per-bit loop:
+
+```cs
+ReadOnlySpan<byte> data = [0b_0000_0101, 0b_0001_0000];
+var bits = new BitArray(data);
+int setBits = bits.PopCount(); // 3
+```
+
+The constructors still copy into the `BitArray`'s own storage; they do not alias the input.
 
 ## Frozen collections
 

@@ -1,6 +1,6 @@
 public class ListMultiply
 {
-    private const int factor = 42;
+    private const int factor = 11;
     private readonly List<int> list = Enumerable.Range(0, 10000).ToList();
 
     [Benchmark]

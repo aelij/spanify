@@ -7,11 +7,11 @@ public class StringHash
     [ParamsSource(nameof(Values))]
     public string text = string.Empty;
 
-    public static IEnumerable<string> Values => new[]
-    {
+    public static IEnumerable<string> Values =>
+    [
         "abcdefghijklmnopqrstuvwxyz",
         string.Join("", Enumerable.Repeat("abcdefghijklmnopqrstuvwxyz", 1000)),
-    };
+    ];
 
     [Benchmark]
     public string Sha256Naive()

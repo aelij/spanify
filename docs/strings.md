@@ -12,22 +12,29 @@ Now we can just slice the `Span` using the range operator, an $O(1)$ operation. 
 int.Parse("12345".AsSpan()[1..3]) // results in 23
 ```
 
+BenchmarkDotNet results:
+
+| Method         | Mean     | Ratio | Allocated |
+|--------------- |---------:|------:|----------:|
+| ParseSubstring | 6.123 ns |  1.60 |      32 B |
+| ParseAsSpan    | 3.828 ns |  1.00 |         - |
+
 ### Example: Concatenating strings
 
 
 ```cs
-const string text = "abcdefghijklmnopq";
+const string text = "abcdefghijklmnopqrstuvwxyz";
 
 string ConcatSubstring() => text[10..] + "---" + text[..5];
 string ConcatAsSpan() => string.Concat(text.AsSpan()[10..], "---", text.AsSpan()[..5]);
 ```
 
-BenchmarkDotnet results - note the reduction in allocated memory:
+BenchmarkDotNet results - note the reduction in allocated memory:
 
-|       Method |     Mean |    Error |   StdDev |  Gen 0 | Allocated |
-|------------- |---------:|---------:|---------:|-------:|----------:|
-|    Substring | 30.28 ns | 0.633 ns | 0.621 ns | 0.0306 |     128 B |
-|       AsSpan | 17.30 ns | 0.377 ns | 0.476 ns | 0.0134 |      56 B |
+| Method          | Mean      | Error     | StdDev    | Ratio | Gen0   | Allocated |
+|---------------- |----------:|----------:|----------:|------:|-------:|----------:|
+| ConcatSubstring | 11.502 ns | 0.0855 ns | 0.0714 ns |  2.56 | 0.0191 |     160 B |
+| ConcatAsSpan    |  4.498 ns | 0.0179 ns | 0.0168 ns |  1.00 | 0.0086 |      72 B |
 
 ## Creating strings of a known size using `String.Create`
 
@@ -47,6 +54,13 @@ static string Reverse(this string s) =>
     });
 ```
 
+BenchmarkDotNet results for a 26-character string:
+
+| Method              | Mean      | Ratio | Allocated |
+|-------------------- |----------:|------:|----------:|
+| ReverseNaive        | 44.449 ns |  7.88 |     208 B |
+| ReverseStringCreate |  5.644 ns |  1.00 |      80 B |
+
 ### Example: Creating a random string
 
 > [!TIP]
@@ -65,9 +79,7 @@ static string GetRandomString(int size, char min = 'a', char max = 'z') =>
 
 ### Example: Passing a `Span<T>` to the `Create` method
 
-#### .NET 9+
-
-C# 13 introduces the `allows ref struct` generic anti-constraint, which allows us to pass a `Span<T>` to generic methods and types such as the `String.Create` method. Note we need to use a helper ref struct since `ValueTuple`s are not ones (and unfortunately there's no `ref struct record` yet).
+The `allows ref struct` generic anti-constraint allows us to pass a `Span<T>` to generic methods and types such as the `String.Create` method. Note we need to use a helper ref struct since `ValueTuple`s are not ones (and unfortunately there's no `ref struct record` yet).
 
 ```cs
 public static string ReplaceNonAlphanumeric(this ReadOnlySpan<char> s, char replacement)
@@ -89,29 +101,12 @@ private readonly ref struct ReplaceNonAlphanumericData(ReadOnlySpan<char> s, cha
 }
 ```
 
-#### .NET 8-
+BenchmarkDotNet results:
 
-`ref struct`s such as `Span` can't be used in generic type parameters in .NET 8 (since there was no way to prevent boxing), so if we want to base one string on another, we'll have to use `unsafe` code - a pointer - in order to pass it into the generic `SpanAction<T, TArg>` delegate.
-
-> [!IMPORTANT]
-> Be careful when using unsafe code - it could easily lead to memory corruption. Extensively cover it with tests.
-
-```cs
-#pragma warning disable CS8500
-unsafe static string ReplaceNonAlphanumeric(this ReadOnlySpan<char> s, char replacement)
-{
-    return string.Create(s.Length, (replacement, spanPtr: (IntPtr)(&s)), static (span, state) =>
-    {
-        var sourceSpan = *(ReadOnlySpan<char>*)state.spanPtr;
-        for (int i = 0; i < span.Length; i++)
-        {
-            var c = sourceSpan[i];
-            span[i] = char.IsLetterOrDigit(c) ? c : state.replacement;
-        }
-    });
-}
-#pragma warning restore CS8500
-```
+| Method               | Mean     | Ratio | Allocated |
+|--------------------- |---------:|------:|----------:|
+| ReplaceStringBuilder | 44.41 ns |  2.22 |     208 B |
+| ReplaceSpan          | 20.02 ns |  1.00 |      80 B |
 
 Using `ReadOnlySpan<char>` as the parameter rather than a string, allows us a lot of flexibility - we can stack-allocate the string, and we can transform it without allocations, as we'll see in the next section.
 
@@ -132,7 +127,7 @@ static string SubstringToLower(this string s, int length) =>
     string.Create(length, (s, length), static (span, state) => state.s.AsSpan()[..state.length].ToLowerInvariant(span));
 ```
 
-We can also create an alternative design for the `ReplaceNonAlphanumeric` method that does not use unsafe code by adding a parameter for the destination span.
+An alternative design for the `ReplaceNonAlphanumeric` method accepts a destination span.
 
 ```cs
 static void ReplaceNonAlphanumeric(this ReadOnlySpan<char> source, Span<char> destination, char replacement)
@@ -195,6 +190,13 @@ bool MatchesUriPattern(IEnumerable<Regex> patterns, Uri uri)
 }
 ```
 
+BenchmarkDotNet results for `https://github.com/aelij/spanify`:
+
+| Method                 | Mean     | Ratio | Allocated |
+|----------------------- |---------:|------:|----------:|
+| MatchesUriPatternNaive | 41.96 ns |  1.33 |     104 B |
+| MatchesUriPatternSpan  | 31.57 ns |  1.00 |      32 B |
+
 ### Example: Using substrings in interpolated strings
 
 Interpolated string handlers have overloads for `ReadOnlySpan<char>`, which allows us to get substrings without allocating new strings.
@@ -256,6 +258,18 @@ handler.AppendLiteral("World");
 var result = handler.ToStringAndClear(); // "World"
 ```
 
+### Moving `StringBuilder` content
+
+`StringBuilder.MoveChunks(source)` transfers the source's chunks to a new builder without copying their characters, leaving the source empty and ready for reuse.
+
+```cs
+var source = new StringBuilder();
+source.Append("status=").Append(200);
+var transferred = StringBuilder.MoveChunks(source);
+Debug.Assert(source.Length == 0);
+Debug.Assert(transferred.Length == "status=200".Length);
+```
+
 ## Span searches with custom comparers
 
 `MemoryExtensions` has overloads for many search methods that accept an `IEqualityComparer<T>`. This enables custom equality logic for span operations like `IndexOf`, `Contains`, `Count`, and more.
@@ -276,6 +290,74 @@ This also works for `StartsWith`, `EndsWith`, `SequenceEqual`, and the `*Any`/`*
 ReadOnlySpan<string> values = ["Hello", "World", "hello"];
 values.ContainsAny(["HELLO", "WORLD"], StringComparer.OrdinalIgnoreCase); // true
 values.IndexOfAnyExcept(["hello"], StringComparer.OrdinalIgnoreCase); // 1 ("World")
+```
+
+## Whitespace searches
+
+`MemoryExtensions.ContainsAnyWhiteSpace`, `IndexOfAnyWhiteSpace` and `LastIndexOfAnyWhiteSpace` search using `char.IsWhiteSpace` semantics, without converting a span into a string. `IndexOfAnyExceptWhiteSpace` and `LastIndexOfAnyExceptWhiteSpace` find non-whitespace characters. Index-returning methods return `-1` when there is no match.
+
+```cs
+ReadOnlySpan<char> text = "\tname\u2003value ";
+bool hasWhiteSpace = text.ContainsAnyWhiteSpace(); // true
+int firstContent = text.IndexOfAnyExceptWhiteSpace(); // 1
+int lastContent = text.LastIndexOfAnyExceptWhiteSpace(); // 10
+```
+
+## Unicode scalar operations
+
+A `char` is a UTF-16 code unit, not necessarily a whole Unicode scalar value. `String` overloads accept `Rune` for searches, replacement, splitting and trimming.
+
+`RunePosition.EnumerateUtf8` / `EnumerateUtf16` enumerate the runes in a span along with each rune's `StartIndex`, `Length` and whether it `WasReplaced` (invalid input).
+
+### Example: Converting UTF-8 to `camelCase`
+
+Converts a UTF-8 name (for example, a JSON property name) to camelCase without decoding it to a string. Runes that don't change are copied as-is from the source.
+
+```cs
+static bool TryToCamelCase(ReadOnlySpan<byte> source, Span<byte> destination, out int bytesWritten)
+{
+    bytesWritten = 0;
+    bool upperNext = false;
+    foreach (var position in RunePosition.EnumerateUtf8(source))
+    {
+        if (position.WasReplaced)
+        {
+            return false; // invalid UTF-8
+        }
+
+        var rune = position.Rune;
+        if (!Rune.IsLetterOrDigit(rune))
+        {
+            upperNext = bytesWritten > 0;
+            continue;
+        }
+
+        var cased = bytesWritten == 0 ? Rune.ToLowerInvariant(rune) :
+            upperNext ? Rune.ToUpperInvariant(rune) : rune;
+        upperNext = false;
+
+        if (cased == rune)
+        {
+            var bytes = source.Slice(position.StartIndex, position.Length);
+            if (!bytes.TryCopyTo(destination[bytesWritten..]))
+            {
+                return false;
+            }
+
+            bytesWritten += bytes.Length;
+        }
+        else if (cased.TryEncodeToUtf8(destination[bytesWritten..], out int written))
+        {
+            bytesWritten += written;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
 ```
 
 ## Hashing a string
@@ -319,6 +401,15 @@ static string GetSha256(this string s)
 }
 ```
 
+BenchmarkDotNet results compared with allocating the UTF-8 input and hash arrays:
+
+| Characters | Method      | Mean        | Ratio | Allocated |
+|-----------:|------------ |------------:|------:|----------:|
+|         26 | Sha256Naive |    616.4 ns |  1.00 |     264 B |
+|         26 | Sha256Span  |    617.6 ns |  1.00 |     152 B |
+|      26000 | Sha256Naive | 10,919.1 ns |  1.07 |   26232 B |
+|      26000 | Sha256Span  | 10,238.0 ns |  1.00 |     152 B |
+
 ## Splitting strings
 
 `MemoryExtensions` methods `Split` and `SplitAny` allow us to split strings with no allocations. Unlike `String.Split`, it writes the results to a `Span<Range>`, which means we have to pre-allocate the ranges. If there are more matches than the ranges provide, the last range will contain the remainder of the string.
@@ -351,7 +442,7 @@ Finally, the `Regex.EnumerateSplits()` method provides the full power of the reg
 
 ## Optimized value searches using `SearchValues`
 
-Methods like `ContainsAny` and `IndexOfAny` can benefit from various optimizations, depending on the characters searched. For example, if the value contain only ASCII characters, or whether it's up to 5 characters, or represents a contiguous range (e.g. a-z). Determining the optimization is done once when `StringValues` is created.
+Methods like `ContainsAny` and `IndexOfAny` can benefit from various optimizations, depending on the characters searched. For example, if the value contain only ASCII characters, or whether it's up to 5 characters, or represents a contiguous range (e.g. a-z). Determining the optimization is done once when `SearchValues` is created.
 
 Many .NET classes, such as JSON parsing, regular expressions and `Uri` have been enhanced with it.
 
